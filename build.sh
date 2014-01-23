@@ -24,10 +24,10 @@ for s in $sources; do
 	ext=$(echo $s | sed -E 's/^.*\.([a-zA-Z]+)$/\1/')
 	case $ext in
 		c )
-		lang="c -std=c99 -include lpc.h"
+		lang="c -std=c99"
 			;;
 		cpp )
-		lang="c++ -include lpc.h"
+		lang="c++"
 			;;
 		s )
 		lang=assembler
@@ -43,9 +43,7 @@ for s in $sources; do
 	echo "Building $s"
 	arm-none-eabi-gcc -nostdlib -nodefaultlibs -fno-exceptions \
 		-g -Os -mthumb -march=armv6-m -mcpu=cortex-m0 -Wno-attributes \
-		-D__LPC11UXX__ -DUSB_DEVICE_ONLY \
-		-I . -I lib/CDL/CMSISv2p00_LPC11Uxx/lpcinc -I lib/CDL/CMSISv2p00_LPC11Uxx/inc \
-		-I lib/CDL/LPC11UxxLib/inc -I lib/LPCUSBLib/Drivers/USB \
+		-I . \
 		-o $o -x $lang -c $s
 
 		if [ $? -ne 0 ]; then

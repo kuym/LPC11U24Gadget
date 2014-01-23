@@ -1,6 +1,6 @@
-#include "LPC11U00.h"
-#include "LPC11U00API.h"
-#include "LPCUSB.h"
+#include <LPC11U00.h>
+#include <LPC11U00API.h>
+#include <LPCUSB.h>
 #include <string.h>
 
 using namespace LPC11U00;
@@ -276,6 +276,14 @@ ErrorCode	classHandler(	USBHandle usb,
 															descriptorLength
 														);
 				}
+				return(ErrorCode_OK);
+
+			case USBDeviceRequest_GetConfiguration:
+				(*API)->usb->hardware->EndpointWrite(	gUSBAPIHandle,
+														0x80,
+														(unsigned char*)"\x01",
+														1
+													);
 				return(ErrorCode_OK);
 
 			case USBDeviceRequest_SetConfiguration:

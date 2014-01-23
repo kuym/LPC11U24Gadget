@@ -123,8 +123,8 @@ namespace LPCUSB
 
 	struct __attribute__((packed)) USBDescriptorHeader
 	{
-		uint8_t size;	// Size of the descriptor, in bytes.
-		uint8_t type;	// Type of the descriptor, either one of USBDescriptorType_* or a value
+		unsigned char	size;	// Size of the descriptor, in bytes.
+		unsigned char	type;	// Type of the descriptor, either one of USBDescriptorType_* or a value
 	};
 
 	struct __attribute__((packed)) USBDescriptorDevice
@@ -291,7 +291,7 @@ namespace LPCUSB
 
 		ErrorCode	(*CDCEndpoint0Handler)(		USBHandle usb,
 												void* closure,
-												uint32_t endpointEvent
+												unsigned int endpointEvent
 											);
 	};
 
