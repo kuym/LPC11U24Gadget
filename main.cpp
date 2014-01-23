@@ -22,6 +22,8 @@ struct USBState
 	unsigned int	task;
 	unsigned int	taskParameter;
 
+	unsigned int	lastSetupType;
+
 	unsigned char*	in;
 	unsigned int	inDest;
 	unsigned int	inLength;
@@ -184,6 +186,10 @@ unsigned char const*	findNthDescriptor(unsigned char const* base, size_t length,
 }
 
 
+ErrorCode	USBStandardSetupHandler(USBSetup const* setupPacket);
+
+ErrorCode	USBVendorSetupHandler(USBSetup const* setupPacket);
+
 ErrorCode	classHandler(	USBHandle usb,
 							void* closure,
 							USBEvent endpointEvent
@@ -205,119 +211,160 @@ ErrorCode	classHandler(	USBHandle usb,
 			UART::writeSync("\nbR:");
 			UART::writeHexDumpSync((unsigned char const*)&setupPacket, sizeof(setupPacket));
 			
-			switch(setupPacket.bRequest)
+			gUSBState.lastSetupType = setupPacket.bmRequestType;
+
+			switch(setupPacket.bmRequestType & USBSetup_Type__Mask)
 			{
-			case USBDeviceRequest_SetAddress:
-				UART::writeSync(":sa");
-				(*API)->usb->hardware->EndpointWrite(gUSBAPIHandle, 0x80, (unsigned char*)"", 0);
-				
-				gUSBState.taskParameter = setupPacket.wValue;
-				gUSBState.task = USBTask_ChangeAddressPending;
-				
-				return(ErrorCode_OK);
-
-			case USBDeviceRequest_GetDescriptor:
-				{
-					UART::writeSync(":dd");
-					
-					unsigned char const* descriptor = 0;	// determine the right one to send
-					size_t descriptorLength = 0;
-
-					switch(setupPacket.wValue >> 8)
-					{
-					case DescriptorType_Device:
-						descriptor = (unsigned char*)&kDeviceDescriptor;
-						descriptorLength = sizeof(kDeviceDescriptor);
-						break;
-					case DescriptorType_Configuration:
-					case DescriptorType_Interface:
-					case DescriptorType_Endpoint:
-					case DescriptorType_CSInterface:
-					case DescriptorType_CSEndpoint:
-						descriptor = (unsigned char*)&kConfigurationDescriptor;
-						descriptorLength = sizeof(kConfigurationDescriptor) - 1;
-						break;
-					case DescriptorType_String:
-						descriptor = (unsigned char*)kUSBStrings;
-						descriptorLength = sizeof(kUSBStrings);
-						break;
-					}
-
-					UART::writeSync("\n<");
-					UART::writeSync((unsigned int)descriptor, NumberFormatter::Hexadecimal);
-					UART::writeSync("<");
-					
-					// get the Nth descriptor of the right type from the array
-					descriptor = findNthDescriptor(		descriptor,
-														descriptorLength,
-														(setupPacket.wValue >> 8),
-														(setupPacket.wValue & 0xFF)
-													);
-					
-					// clip to the size of the descriptor element itself. Note that the root
-					//   configuration descriptor's effective size includes child elements
-					if(setupPacket.wValue == (DescriptorType_Configuration << 8))
-						descriptorLength = descriptor[2];	// account for sentinel
-					else
-						descriptorLength = descriptor[0];
-					
-					if(setupPacket.wLength < descriptorLength)
-						descriptorLength = setupPacket.wLength;
-					
-					UART::writeSync((unsigned int)descriptor, NumberFormatter::Hexadecimal);
-					UART::writeSync("<");
-					UART::writeSync(descriptorLength, NumberFormatter::DecimalUnsigned);
-					UART::writeSync("<");
-					UART::writeHexDumpSync(descriptor, descriptorLength);
-					
-					(*API)->usb->hardware->EndpointWrite(	gUSBAPIHandle,
-															0x80,
-															(unsigned char*)descriptor,
-															descriptorLength
-														);
-				}
-				return(ErrorCode_OK);
-
-			case USBDeviceRequest_GetConfiguration:
-				(*API)->usb->hardware->EndpointWrite(	gUSBAPIHandle,
-														0x80,
-														(unsigned char*)"\x01",
-														1
-													);
-				return(ErrorCode_OK);
-
-			case USBDeviceRequest_SetConfiguration:
-				UART::writeSync(":sc");
-
-				(*API)->usb->hardware->SetConfiguration(	gUSBAPIHandle,
-															gUSBState.taskParameter
-														);
-				
-				//(*API)->usb->hardware->Reset(gUSBAPIHandle);	//@@required by the spec but seems to not work
-				
-				// send a ZLP
-				(*API)->usb->hardware->EndpointWrite(gUSBAPIHandle, 0x80, (unsigned char*)"", 0);
-
-				gUSBState.taskParameter = setupPacket.wValue;
-				gUSBState.task = USBTask_SetConfiguration;
-				return(ErrorCode_OK);
-
-			default:
-				UART::writeSync("?");
-				break;
+			case USBSetup_Type_Standard:
+				return(USBStandardSetupHandler(&setupPacket));
+			case USBSetup_Type_Vendor:
+				return(USBVendorSetupHandler(&setupPacket));
 			}
 		}
 		break;
 
 	case USBEvent_In:
-		if(gUSBState.task == USBTask_ChangeAddressPending)
-			gUSBState.task = USBTask_ChangeAddress;
-		
-		return(0);
+		if((gUSBState.lastSetupType & USBSetup_Type__Mask) == USBSetup_Type_Standard)
+		{
+			if(gUSBState.task == USBTask_ChangeAddressPending)
+				gUSBState.task = USBTask_ChangeAddress;
+			
+			return(0);
+		}
+		break;
 	}
 
 	return(ErrorCode_Unhandled);
 }
+
+ErrorCode	USBStandardSetupHandler(USBSetup const* setupPacket)
+{
+	switch(setupPacket->bRequest)
+	{
+	case USBDeviceRequest_ClearFeature:
+		UART::writeSync(":cf:");
+		UART::writeSync((unsigned int)setupPacket->wValue, NumberFormatter::Hexadecimal);
+		(*API)->usb->hardware->EndpointWrite(gUSBAPIHandle, 0x80, (unsigned char*)"", 0);
+		break;
+
+	case USBDeviceRequest_SetFeature:
+		UART::writeSync(":sf:");
+		UART::writeSync((unsigned int)setupPacket->wValue, NumberFormatter::Hexadecimal);
+		(*API)->usb->hardware->EndpointWrite(gUSBAPIHandle, 0x80, (unsigned char*)"", 0);
+		break;
+
+	case USBDeviceRequest_SetAddress:
+		UART::writeSync(":sa");
+		(*API)->usb->hardware->EndpointWrite(gUSBAPIHandle, 0x80, (unsigned char*)"", 0);
+		
+		gUSBState.taskParameter = setupPacket->wValue;
+		gUSBState.task = USBTask_ChangeAddressPending;
+		
+		return(ErrorCode_OK);
+
+	case USBDeviceRequest_GetDescriptor:
+		{
+			UART::writeSync(":dd");
+			
+			unsigned char const* descriptor = 0;	// determine the right one to send
+			size_t descriptorLength = 0;
+
+			switch(setupPacket->wValue >> 8)
+			{
+			case DescriptorType_Device:
+				descriptor = (unsigned char*)&kDeviceDescriptor;
+				descriptorLength = sizeof(kDeviceDescriptor);
+				break;
+			case DescriptorType_Configuration:
+			case DescriptorType_Interface:
+			case DescriptorType_Endpoint:
+			case DescriptorType_CSInterface:
+			case DescriptorType_CSEndpoint:
+				descriptor = (unsigned char*)&kConfigurationDescriptor;
+				descriptorLength = sizeof(kConfigurationDescriptor) - 1;
+				break;
+			case DescriptorType_String:
+				descriptor = (unsigned char*)kUSBStrings;
+				descriptorLength = sizeof(kUSBStrings);
+				break;
+			}
+
+			UART::writeSync("\n<");
+			UART::writeSync((unsigned int)descriptor, NumberFormatter::Hexadecimal);
+			UART::writeSync("<");
+			
+			// get the Nth descriptor of the right type from the array
+			descriptor = findNthDescriptor(		descriptor,
+												descriptorLength,
+												(setupPacket->wValue >> 8),
+												(setupPacket->wValue & 0xFF)
+											);
+			
+			// clip to the size of the descriptor element itself. Note that the root
+			//   configuration descriptor's effective size includes child elements
+			if(setupPacket->wValue == (DescriptorType_Configuration << 8))
+				descriptorLength = descriptor[2];	// account for sentinel
+			else
+				descriptorLength = descriptor[0];
+			
+			if(setupPacket->wLength < descriptorLength)
+				descriptorLength = setupPacket->wLength;
+			
+			UART::writeSync((unsigned int)descriptor, NumberFormatter::Hexadecimal);
+			UART::writeSync("<");
+			UART::writeSync(descriptorLength, NumberFormatter::DecimalUnsigned);
+			UART::writeSync("<");
+			UART::writeHexDumpSync(descriptor, descriptorLength);
+			
+			(*API)->usb->hardware->EndpointWrite(	gUSBAPIHandle,
+													0x80,
+													(unsigned char*)descriptor,
+													descriptorLength
+												);
+		}
+		return(ErrorCode_OK);
+
+	case USBDeviceRequest_GetConfiguration:
+		UART::writeSync(":gc");
+		(*API)->usb->hardware->EndpointWrite(	gUSBAPIHandle,
+												0x80,
+												(unsigned char*)"\x01",
+												1
+											);
+		return(ErrorCode_OK);
+
+	case USBDeviceRequest_SetConfiguration:
+		UART::writeSync(":sc");
+
+		(*API)->usb->hardware->SetConfiguration(	gUSBAPIHandle,
+													gUSBState.taskParameter
+												);
+		
+		//(*API)->usb->hardware->Reset(gUSBAPIHandle);	//@@required by the spec but seems to not work
+		
+		// send a ZLP
+		(*API)->usb->hardware->EndpointWrite(gUSBAPIHandle, 0x80, (unsigned char*)"", 0);
+
+		gUSBState.taskParameter = setupPacket->wValue;
+		gUSBState.task = USBTask_SetConfiguration;
+		return(ErrorCode_OK);
+
+	default:
+		UART::writeSync("?");
+		break;
+	}
+
+	return(ErrorCode_Unhandled);
+}
+
+ErrorCode	USBVendorSetupHandler(USBSetup const* setupPacket)
+{
+	// send a ZLP
+	(*API)->usb->hardware->EndpointWrite(gUSBAPIHandle, 0x80, (unsigned char*)"", 0);
+
+	return(ErrorCode_OK);
+}
+
 
 // @@currently unused
 ErrorCode	endpointHandler(	USBHandle usb,

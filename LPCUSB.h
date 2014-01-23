@@ -94,6 +94,25 @@ namespace LPCUSB
 											USBEvent endpointEvent
 										);
 	
+	enum USBSetupRequestType
+	{
+		USBSetup_Direction_ToDevice		= (0 << 7),
+		USBSetup_Direction_ToHost		= (1 << 7),
+		USBSetup_Direction__Mask		= (1 << 7),
+		
+		USBSetup_Type_Standard			= (0 << 5),
+		USBSetup_Type_Class				= (1 << 5),
+		USBSetup_Type_Vendor			= (2 << 5),
+		USBSetup_Type_Reserved			= (3 << 5),
+		USBSetup_Type__Mask				= (3 << 5),
+		
+		USBSetup_Recipient_Device		= (0 << 0),
+		USBSetup_Recipient_Interface	= (1 << 0),
+		USBSetup_Recipient_Endpoint		= (2 << 0),
+		USBSetup_Recipient_Other		= (3 << 0),
+		USBSetup_Recipient__Mask		= (0x1F),
+	};
+
 	struct __attribute__((packed)) USBSetup
 	{
 		unsigned char	bmRequestType;

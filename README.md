@@ -10,3 +10,10 @@ with additional features.
 
 
 This project is a work-in-progress.
+
+
+## Good references for development
+
+* [USB in a Nutshell](http://www.beyondlogic.org/usbnutshell/usb1.shtml)
+* [USB Made Simple](http://www.usbmadesimple.co.uk/index.html)
+* [Jungo USB documentation](http://www.jungo.com/st/support/documentation/windriver/811/wdusb_man_mhtml/node55.html)
