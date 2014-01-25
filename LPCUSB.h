@@ -122,16 +122,6 @@ namespace LPCUSB
 		unsigned short	wLength;
 	};
 
-	struct __attribute__((packed)) EndpointDescriptor
-	{
-		unsigned char	bLength;
-		unsigned char	bDescriptorType;
-		unsigned char	bEndpointAddress;
-		unsigned char	bmAttributes;
-		unsigned short	wMaxPacketSize;
-		unsigned char	bInterval;
-	};
-	
 	struct __attribute__((packed)) ACMLineCoding
 	{
 		unsigned int	dwDTERate;
@@ -418,7 +408,7 @@ namespace LPCUSB
 											);
 		//special override function, not normally necessary to call
 		void			(*ConfigureEndpoint)(	USBHandle usb,
-												EndpointDescriptor* descriptor
+												USBDescriptorEndpoint* descriptor
 											);
 		//special override function, not normally necessary to call
 		void			(*SetEndpointDirection)(	USBHandle usb,
@@ -462,7 +452,7 @@ namespace LPCUSB
 
 		unsigned int	(*EndpointReadSetup)(	USBHandle usb,
 												unsigned int endpointNum,
-												unsigned int* pData
+												unsigned int* data
 											);
 
 

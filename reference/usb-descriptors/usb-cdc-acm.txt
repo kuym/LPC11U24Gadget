@@ -1,0 +1,60 @@
+Number Of Endpoints (includes EP0):
+    Total Endpoints for Configuration 1 (current):   4
+Device Descriptor
+    Descriptor Version Number:   0x0200
+    Device Class:   2   (Communication)
+    Device Subclass:   0
+    Device Protocol:   0
+    Device MaxPacketSize:   8
+    Device VendorID/ProductID:   0x0000/0x0000
+    Device Version Number:   0x0000
+    Number of Configurations:   1
+    Manufacturer String:   1 ""
+    Product String:   2 ""
+    Serial Number String:   3 ""
+Configuration Descriptor (current config)
+    Length (and contents):   67
+        Raw Descriptor (hex)    0000: 09 02 43 00 02 01 00 80  64 09 04 00 00 01 02 02
+        Raw Descriptor (hex)    0010: 01 00 05 24 00 10 01 04  24 02 02 05 24 06 00 01
+        Raw Descriptor (hex)    0020: 05 24 01 00 01 07 05 82  03 08 00 02 09 04 01 00
+        Raw Descriptor (hex)    0030: 02 0A 00 00 00 07 05 03  02 40 00 00 07 05 83 02
+        Raw Descriptor (hex)    0040: 40 00 00
+    Number of Interfaces:   2
+    Configuration Value:   1
+    Attributes:   0x80 (bus-powered)
+    MaxPower:   100 mA
+    Interface #0 - Communications-Control
+        Alternate Setting   0
+        Number of Endpoints   1
+        Interface Class:   2   (Communications-Control)
+        Interface Subclass;   2
+        Interface Protocol:   1
+        Comm Class Header Functional Descriptor
+            Raw Descriptor (hex)   0000: 05 24 00 10 01
+        Comm Class Abstract Control Management Functional Descriptor
+            Raw Descriptor (hex)   0000: 04 24 02 02
+        Comm Class Union Functional Descriptor
+            Raw Descriptor (hex)   0000: 05 24 06 00 01
+        Comm Class Call Management Functional Descriptor
+            Raw Descriptor (hex)   0000: 05 24 01 00 01
+        Endpoint 0x82 - Interrupt Input
+            Address:   0x82  (IN)
+            Attributes:   0x03  (Interrupt)
+            Max Packet Size:   8
+            Polling Interval:   2 ms
+    Interface #1 - Communications-Data/Unknown Comm Class Model
+        Alternate Setting   0
+        Number of Endpoints   2
+        Interface Class:   10   (Communications-Data)
+        Interface Subclass;   0   (Unknown Comm Class Model)
+        Interface Protocol:   0
+        Endpoint 0x03 - Bulk Output
+            Address:   0x03  (OUT)
+            Attributes:   0x02  (Bulk)
+            Max Packet Size:   64
+            Polling Interval:   0 ms
+        Endpoint 0x83 - Bulk Input
+            Address:   0x83  (IN)
+            Attributes:   0x02  (Bulk)
+            Max Packet Size:   64
+            Polling Interval:   0 ms
