@@ -14,6 +14,13 @@ void delay(unsigned int ms)
 			__asm__ volatile ("nop \n nop \n nop \n nop \n" ::);
 }
 
+void		memset_volatile(void volatile* dest, unsigned int value, unsigned int length)
+{
+	volatile unsigned char* p = (volatile unsigned char*)dest;
+	for(unsigned int i = 0; i < length; i++)
+		*p++ = 0;
+}
+
 ////////////////////////////////////////////////////////////////
 // NumberFormatter formats numbers into text
 

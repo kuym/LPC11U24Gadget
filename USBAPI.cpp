@@ -44,14 +44,6 @@ static USBState gUSBState;
 static USBHandle gUSBAPIHandle;
 
 
-
-void		memset_volatile(void volatile* dest, unsigned int value, unsigned int length)
-{
-	volatile unsigned char* p = (volatile unsigned char*)dest;
-	for(int i = 0; i < length; i++)
-		*p++ = 0;
-}
-
 static unsigned char const*	findNthDescriptor(unsigned char const* base, size_t length, int ofType, int index)
 {
 	while(length > 0)
@@ -111,6 +103,7 @@ static ErrorCode	registerHandlersFromDescriptor(unsigned char const* descriptor,
 		}
 		index++;
 	}
+	return(ErrorCode_OK);
 }
 
 
@@ -149,11 +142,20 @@ static ErrorCode	packetHandler(		USBHandle usb,
 			else
 			{
 				// for class and vendor requests, pass it on to the appropriate handler
-				Handler* h = 0;
+				Handler* h = gUSBState.handlers;
 
 				// find a handler for this closure
 				while((h != 0) && (h->receiver != (USBDescriptorHeader const*)closure))
 					h = h->next;
+				/*while((h != 0))
+				{
+					UART::writeSync("\nfind: ");
+					UART::writeSync((unsigned int)h->receiver, NumberFormatter::Hexadecimal);
+					UART::writeSync(" ?= ");
+					UART::writeSync((unsigned int)closure, NumberFormatter::Hexadecimal);
+					if((h->receiver == (USBDescriptorHeader const*)closure)) break;
+					h = h->next;
+				}*/
 				
 				if(h != 0)
 					result = h->handler(h->context, (USBDescriptorHeader const*)closure, &setupPacket);
@@ -191,6 +193,7 @@ static ErrorCode	packetHandler(		USBHandle usb,
 			case USBSetup_Type_Standard:
 				result = standardSetupHandler(&gUSBState, (USBDescriptorHeader const*)closure, 0);
 				break;
+
 			case USBSetup_Type_Class:
 			case USBSetup_Type_Vendor:
 				{
@@ -200,8 +203,11 @@ static ErrorCode	packetHandler(		USBHandle usb,
 					while((h != 0) && (h->receiver != (USBDescriptorHeader const*)closure))
 						h = h->next;
 					
-					result = h->handler(h->context, (USBDescriptorHeader const*)closure, 0);
+					if(h != 0)
+						result = h->handler(h->context, (USBDescriptorHeader const*)closure, 0);
 				}
+				break;
+
 			default:
 				UART::writeSync(" OUT unhandled!");
 				break;
@@ -377,6 +383,7 @@ ErrorCode		USB::Interrupt(void)
 		gUSBState.task = USBTask_Idle;
 		break;
 	}
+	return(ErrorCode_OK);
 }
 
 void			USB::Init(void)
@@ -386,32 +393,33 @@ void			USB::Init(void)
 	gUSBAPIHandle = 0;
 }
 
-ErrorCode		USB::setDescriptor(		unsigned char const* descriptor,
+ErrorCode		USB::SetDescriptor(		void const* descriptor,
 										unsigned int length
 									)
 {
 	switch(((USBDescriptorHeader*)descriptor)->type)
 	{
 	case DescriptorType_Device:
-		gUSBState.descriptors.deviceDescriptor = descriptor;
+		gUSBState.descriptors.deviceDescriptor = (USBDescriptorHeader*)descriptor;
 		gUSBState.deviceDescriptorLength = length;
 		break;
 	case DescriptorType_Configuration:
-		gUSBState.descriptors.fullSpeedDescriptor = descriptor;
-		gUSBState.descriptors.highSpeedDescriptor = descriptor;
+		gUSBState.descriptors.fullSpeedDescriptor = (USBDescriptorHeader*)descriptor;
+		gUSBState.descriptors.highSpeedDescriptor = (USBDescriptorHeader*)descriptor;
 		gUSBState.configurationDescriptorLength = length - 1;
 		break;
 	case DescriptorType_String:
-		gUSBState.descriptors.stringDescriptor = descriptor;
+		gUSBState.descriptors.stringDescriptor = (USBDescriptorHeader*)descriptor;
 		gUSBState.stringDescriptorLength = length;
 		break;
 	default:
-		return(-1);	//ErrorCode_)
+		UART::writeSync("\nset: bad descriptor");
+		return(-1);	//@@ErrorCode_)
 	}
 	return(ErrorCode_OK);
 }
 
-ErrorCode		USB::start(void)
+ErrorCode		USB::Start(void)
 {
 	//USB setup
 	HardwareInit hardwareInit = {0};
@@ -423,22 +431,29 @@ ErrorCode		USB::start(void)
 	gUSBAPIHandle = 0;
 	ErrorCode usbError = (*API)->usb->hardware->Init(&gUSBAPIHandle, &gUSBState.descriptors, &hardwareInit);
 	if(usbError != 0)
+	{
+		UART::writeSync("\ninit err: ");
+		UART::writeSync(usbError, NumberFormatter::Hexadecimal);
 		return(usbError);
+	}
 
 	usbError = registerHandlersFromDescriptor(		(unsigned char const*)gUSBState.descriptors.fullSpeedDescriptor,
 													gUSBState.configurationDescriptorLength
 												);
 	if(usbError != 0)
+	{
+		UART::writeSync("\nreg handlers err: ");
+		UART::writeSync(usbError, NumberFormatter::Hexadecimal);
 		return(usbError);
+	}
 
-	
 	// user responsible for this
 	//__asm__ volatile ("cpsie i"::);
 	
 	return(ErrorCode_OK);
 }
 
-void			USB::stop(void)
+void			USB::Stop(void)
 {
 	//@@unregister everything and shut down
 
@@ -454,24 +469,25 @@ void			USB::stop(void)
 	Init();
 }
 
-ErrorCode		USB::registerHandler(	USBDescriptorHeader* descriptor,
+ErrorCode		USB::RegisterHandler(	void const* descriptor,
 										USBHandler handler,
 										void* context
 									)
 {
-	switch(((USBDescriptorHeader*)descriptor)->type)
+	switch(((USBDescriptorHeader const*)descriptor)->type)
 	{
 	case DescriptorType_Configuration:
 	case DescriptorType_Endpoint:
 		break;
 	default:
-		return(-1);	//ErrorCode_)
+		UART::writeSync("\nreg: bad descriptor");
+		return(-1);	//@@ErrorCode_)
 	}
 
 	//@@ensure descriptor is unique in the set of handlers.
 
 	Handler* newHandler = new Handler();
-	newHandler->receiver = descriptor;
+	newHandler->receiver = (USBDescriptorHeader const*)descriptor;
 	newHandler->handler = handler;
 	newHandler->context = context;
 	newHandler->next = 0;
@@ -485,14 +501,15 @@ ErrorCode		USB::registerHandler(	USBDescriptorHeader* descriptor,
 	return(ErrorCode_OK);
 }
 
-ErrorCode		USB::connect(void)
+ErrorCode		USB::Connect(void)
 {
 	*InterruptEnableSet0 |= Interrupt0_USB;
 	(*API)->usb->hardware->Connect(gUSBAPIHandle, 1);
 	UART::writeSync("\nconnected");
+	return(ErrorCode_OK);
 }
 
-void			USB::disconnect(void)
+void			USB::Disconnect(void)
 {
 	(*API)->usb->hardware->Connect(gUSBAPIHandle, 0);
 	*InterruptEnableSet0 &= ~Interrupt0_USB;
@@ -500,11 +517,11 @@ void			USB::disconnect(void)
 }
 
 
-unsigned int	USB::read(unsigned int endpoint, unsigned char* dest, unsigned int length)
+unsigned int	USB::Read(unsigned int endpoint, unsigned char* dest)
 {
-	;
+	return((*API)->usb->hardware->EndpointRead(gUSBAPIHandle, endpoint, dest));
 }
-unsigned int	USB::write(unsigned int endpoint, unsigned char* source, unsigned int length)
+unsigned int	USB::Write(unsigned int endpoint, unsigned char* source, unsigned int length)
 {
-	;
+	return((*API)->usb->hardware->EndpointWrite(gUSBAPIHandle, endpoint, source, length));
 }

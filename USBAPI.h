@@ -10,14 +10,12 @@ typedef ErrorCode (*USBHandler)(	void* context,
 								);
 class USB
 {
+public:
 	static	ErrorCode		Interrupt(void);
 	static	void			Init(void);
-	static	ErrorCode		setDescriptor(		unsigned char const* descriptor,
+	static	ErrorCode		SetDescriptor(		void const* descriptor,
 												unsigned int length
 											);
-	static	ErrorCode		start(void);
-	static	void			stop(void);
-
 	// descriptor: pass a pointer to an endpoint descriptor to receive events for that endpoint,
 	//   or pass a pointer to the configuration descriptor to receive all other events
 	//   (including class and vendor requests for the device and interface)
@@ -25,14 +23,17 @@ class USB
 	//   if the setupPacket callback parameter is not 0, it is a SETUP packet and the packet
 	//     structure is available with that pointer.
 	//   otherwise, it is an OUT packet.
-	static	ErrorCode		registerHandler(	USBDescriptorHeader* descriptor,
+	static	ErrorCode		RegisterHandler(	void const* descriptor,
 												USBHandler handler,
 												void* context
 											);
-	static	ErrorCode		connect(void);
-	static	void			disconnect(void);
-	static	unsigned int	read(unsigned int endpoint, unsigned char* dest, unsigned int length);
-	static	unsigned int	write(unsigned int endpoint, unsigned char* source, unsigned int length);
+	static	ErrorCode		Start(void);
+	static	void			Stop(void);
+	
+	static	ErrorCode		Connect(void);
+	static	void			Disconnect(void);
+	static	unsigned int	Read(unsigned int endpoint, unsigned char* dest);
+	static	unsigned int	Write(unsigned int endpoint, unsigned char* source, unsigned int length);
 };
 
 #endif //!defined __USBAPI_H__

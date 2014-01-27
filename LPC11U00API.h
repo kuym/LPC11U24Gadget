@@ -6,6 +6,9 @@ using namespace LPC11U00;
 
 void delay(unsigned int ms);
 
+extern "C" void memset_volatile(void volatile* dest, unsigned int value, unsigned int length);
+
+
 ////////////////////////////////////////////////////////////////
 // NumberFormatter
 
