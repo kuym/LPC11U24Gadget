@@ -42,7 +42,7 @@ extern "C" void	memcpy(void* dest, void const* src, unsigned long length)
 	{
 		*(unsigned char*)dest = *(unsigned char*)src;
 		dest = ((unsigned char*)dest) + 1;
-		src = ((unsigned char*)dest) + 1;
+		src = ((unsigned char*)src) + 1;
 	}
 }
 

@@ -87,6 +87,9 @@ namespace LPCUSB
 		ErrorCode_Stall     			= 0x00040003,	// Stall the endpoint on which the call back is called
 		ErrorCode_SendZeroLengthPacket	= 0x00040004,	// Send ZLP packet on the endpoint on which the call back is called
 		ErrorCode_SendData	 			= 0x00040005,	// Send data packet on the endpoint on which the call back is called
+		ErrorCode_BadDescriptor			= 0x00040006,	// Bad descriptor
+		
+		ErrorCode_TooManyHandlers		= 0x0004000c,	// Too many [class] handlers
 	};
 
 	typedef ErrorCode (*EndpointHandler)(	USBHandle usb,

@@ -106,6 +106,16 @@ static ErrorCode	registerHandlersFromDescriptor(unsigned char const* descriptor,
 	return(ErrorCode_OK);
 }
 
+static Handler*		findHandlerForDescriptor(USBDescriptorHeader const* header)
+{
+	Handler* h = gUSBState.handlers;
+	
+	while((h != 0) && (h->receiver != header))
+		h = h->next;
+
+	return(h);
+}
+
 
 static ErrorCode	packetHandler(		USBHandle usb,
 										void* closure,
@@ -142,20 +152,7 @@ static ErrorCode	packetHandler(		USBHandle usb,
 			else
 			{
 				// for class and vendor requests, pass it on to the appropriate handler
-				Handler* h = gUSBState.handlers;
-
-				// find a handler for this closure
-				while((h != 0) && (h->receiver != (USBDescriptorHeader const*)closure))
-					h = h->next;
-				/*while((h != 0))
-				{
-					UART::writeSync("\nfind: ");
-					UART::writeSync((unsigned int)h->receiver, NumberFormatter::Hexadecimal);
-					UART::writeSync(" ?= ");
-					UART::writeSync((unsigned int)closure, NumberFormatter::Hexadecimal);
-					if((h->receiver == (USBDescriptorHeader const*)closure)) break;
-					h = h->next;
-				}*/
+				Handler* h = findHandlerForDescriptor((USBDescriptorHeader const*)closure);
 				
 				if(h != 0)
 					result = h->handler(h->context, (USBDescriptorHeader const*)closure, &setupPacket);
@@ -181,36 +178,34 @@ static ErrorCode	packetHandler(		USBHandle usb,
 			
 			return(ErrorCode_OK);
 		}
-		else
-			; // prompt the next write to occur
+		else if((gUSBState.lastSetupType & USBSetup_Recipient__Mask) == USBSetup_Recipient_Device)	// possibly prompt the next endpoint IN write to occur
+		{
+			UART::writeSync(" IN type:");
+			UART::writeSync(gUSBState.lastSetupType & USBSetup_Type__Mask, NumberFormatter::Hexadecimal);
+			UART::writeSync(": ");
+			Handler* h = findHandlerForDescriptor((USBDescriptorHeader const*)closure);
+			
+			if(h != 0)
+				return(h->handler(h->context, (USBDescriptorHeader const*)closure, 0));
+		}
 		break;
 
 	case USBEvent_Out:
 		{
 			unsigned int result = ErrorCode_Unhandled;
-			switch(gUSBState.lastSetupType & USBSetup_Type__Mask)
+			if((gUSBState.lastSetupType & USBSetup_Type__Mask) == USBSetup_Type_Standard)
 			{
-			case USBSetup_Type_Standard:
 				result = standardSetupHandler(&gUSBState, (USBDescriptorHeader const*)closure, 0);
-				break;
+			}
+			else
+			{
+				UART::writeSync(" OUT type:");
+				UART::writeSync(gUSBState.lastSetupType & USBSetup_Type__Mask, NumberFormatter::Hexadecimal);
+				UART::writeSync(": ");
+				Handler* h = findHandlerForDescriptor((USBDescriptorHeader const*)closure);
 
-			case USBSetup_Type_Class:
-			case USBSetup_Type_Vendor:
-				{
-					Handler* h = gUSBState.handlers;
-					
-					// find a handler for this closure
-					while((h != 0) && (h->receiver != (USBDescriptorHeader const*)closure))
-						h = h->next;
-					
-					if(h != 0)
-						result = h->handler(h->context, (USBDescriptorHeader const*)closure, 0);
-				}
-				break;
-
-			default:
-				UART::writeSync(" OUT unhandled!");
-				break;
+				if(h != 0)
+					result = h->handler(h->context, (USBDescriptorHeader const*)closure, 0);
 			}
 			return(result);
 		}
@@ -414,7 +409,7 @@ ErrorCode		USB::SetDescriptor(		void const* descriptor,
 		break;
 	default:
 		UART::writeSync("\nset: bad descriptor");
-		return(-1);	//@@ErrorCode_)
+		return(ErrorCode_BadDescriptor);
 	}
 	return(ErrorCode_OK);
 }
@@ -447,16 +442,11 @@ ErrorCode		USB::Start(void)
 		return(usbError);
 	}
 
-	// user responsible for this
-	//__asm__ volatile ("cpsie i"::);
-	
 	return(ErrorCode_OK);
 }
 
 void			USB::Stop(void)
 {
-	//@@unregister everything and shut down
-
 	// remove registered handlers
 	for(Handler* h = gUSBState.handlers; h != 0;)
 	{
@@ -481,11 +471,19 @@ ErrorCode		USB::RegisterHandler(	void const* descriptor,
 		break;
 	default:
 		UART::writeSync("\nreg: bad descriptor");
-		return(-1);	//@@ErrorCode_)
+		return(ErrorCode_BadDescriptor);
 	}
 
-	//@@ensure descriptor is unique in the set of handlers.
+	// ensure descriptor is unique in the set of handlers.
+	Handler* h = gUSBState.handlers;
+	while((h != 0) && (h->receiver != (USBDescriptorHeader const*)descriptor))
+		h = h->next;
+	if(h != 0)
+		return(ErrorCode_TooManyHandlers);
 
+	// allocate a new handler
+	UART::writeSync("\nalloc ");
+	UART::writeSync(sizeof(Handler), NumberFormatter::DecimalUnsigned);
 	Handler* newHandler = new Handler();
 	newHandler->receiver = (USBDescriptorHeader const*)descriptor;
 	newHandler->handler = handler;
