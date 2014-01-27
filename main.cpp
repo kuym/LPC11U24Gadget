@@ -159,6 +159,7 @@ ErrorCode	USBCDCACMHandler(void* context, USBDescriptorHeader const* endpoint, U
 										: 0;
 	
 	// debug
+	/*
 	if(endpointAddress == 0)
 	{
 		UART::writeSync("\ncls:");
@@ -169,6 +170,7 @@ ErrorCode	USBCDCACMHandler(void* context, USBDescriptorHeader const* endpoint, U
 		UART::writeSync(endpointAddress, NumberFormatter::Hexadecimal);
 		UART::writeSync(":");
 	}
+	*/
 	// end debug
 
 	USBCDCDevice* state = (USBCDCDevice*)context;
@@ -179,11 +181,9 @@ ErrorCode	USBCDCACMHandler(void* context, USBDescriptorHeader const* endpoint, U
 		{
 		case USBCDC_Request_SetLineCoding:
 			state->expecting = USBCDC_Request_SetLineCoding;
-			UART::writeSync(" e:sl");
 			return(ErrorCode_SendZeroLengthPacket);
 
 		case USBCDC_Request_GetLineCoding:
-			UART::writeSync(" gl");
 			USB::Write(		0x80,
 							(unsigned char*)&state->lineCoding,
 							sizeof(USBCDCLineCoding)
@@ -194,9 +194,17 @@ ErrorCode	USBCDCACMHandler(void* context, USBDescriptorHeader const* endpoint, U
 			if(setupPacket->wValue & USBCDC_ControlLine_DTEPresent)
 				;
 			if(setupPacket->wValue & USBCDC_ControlLine_ActivateCarrier)
+			{
+				if(!state->connected)
+					UART::writeSync("\nonline");
 				state->connected = 1;
+			}
 			else
+			{
+				if(state->connected)
+					UART::writeSync("\noffline");
 				state->connected = 0;
+			}
 
 			return(ErrorCode_SendZeroLengthPacket);
 		}
@@ -215,7 +223,7 @@ ErrorCode	USBCDCACMHandler(void* context, USBDescriptorHeader const* endpoint, U
 				break;
 			}
 			memcpy(&state->lineCoding, buffer, sizeof(USBCDCLineCoding));
-			UART::writeSync(" sl: ");
+			UART::writeSync("\nformat: ");
 			UART::writeSync(state->lineCoding.dwDTERate, NumberFormatter::DecimalUnsigned);
 			UART::writeSync(",");
 			UART::writeSync(state->lineCoding.bDataBits, NumberFormatter::DecimalUnsigned);
@@ -225,12 +233,11 @@ ErrorCode	USBCDCACMHandler(void* context, USBDescriptorHeader const* endpoint, U
 			break;
 
 		default:
-			UART::writeSync(" crd:");
+			UART::writeSync("\nunhandled class ep0 rd:");
 			UART::writeSync(bytesRead, NumberFormatter::DecimalUnsigned);
 			UART::writeSync(">");
 			UART::writeHexDumpSync(buffer, bytesRead);
 
-			UART::writeSync(" unhandled class EP0 OUT!");
 			break;
 		}
 	}
@@ -239,7 +246,7 @@ ErrorCode	USBCDCACMHandler(void* context, USBDescriptorHeader const* endpoint, U
 		unsigned char buffer[64];
 		unsigned int bytesRead = USB::Read(endpointAddress, buffer);
 		
-		UART::writeSync(" crd:");
+		UART::writeSync("\nep3 rd:");
 		UART::writeSync(bytesRead, NumberFormatter::DecimalUnsigned);
 		UART::writeSync(">");
 		UART::writeHexDumpSync(buffer, bytesRead);
@@ -275,11 +282,6 @@ int main(void)
 
 	*IOConfigPIO0_3 = (*IOConfigPIO0_3 & ~IOConfigPIO_FunctionMask) | IOConfigPIO0_3_Function_PIO;
 
-	UART::start(57600, UART::Default);
-	UART::writeSync("\nboot");
-	UART::flush();
-	UART::stop();
-
 	System::setClockOutput();	//output the core clock
 
 	//Set up PLL to 48MHz, USB PLL to 48MHz also
@@ -287,12 +289,9 @@ int main(void)
 	delay(5);	//stabilize
 
 	UART::start(57600, UART::Default);
-	UART::writeSync("\nclocks ok");
 
 	System::setupUSBPLL();
 
-	UART::writeSync("\nusb clock setup");
-	
 	//USB setup
 	USB::Init();
 
@@ -316,7 +315,7 @@ int main(void)
 	__asm__ volatile ("cpsie i"::);
 	
 	USB::Connect();
-	UART::writeSync("\nconnected");
+	UART::writeSync("\nConnected");
 	
 	while(true)
 	{

@@ -95,10 +95,12 @@ static ErrorCode	registerHandlersFromDescriptor(unsigned char const* descriptor,
 																			);
 		if(registerError != 0)
 		{
+			/*
 			UART::writeSync("\nreg EP 0x");
 			UART::writeSync(((USBDescriptorEndpoint*)ep)->endpointAddress, NumberFormatter::Hexadecimal);
 			UART::writeSync(" err: ");
 			UART::writeSync(registerError, NumberFormatter::Hexadecimal);
+			*/
 			return(registerError);
 		}
 		index++;
@@ -126,10 +128,12 @@ static ErrorCode	packetHandler(		USBHandle usb,
 	if(((USBDescriptorHeader const*)closure)->type == DescriptorType_Configuration)
 		descriptor = (USBDescriptorConfigurationHeader*)closure;
 
+	/*
 	UART::writeSync("\npkt:");
 	UART::writeSync(descriptor? 0 : ((USBDescriptorEndpoint*)closure)->endpointAddress, NumberFormatter::Hexadecimal);
 	UART::writeSync(",");
 	UART::writeSync(endpointEvent, NumberFormatter::Hexadecimal);
+	*/
 	
 	switch(endpointEvent)
 	{
@@ -139,8 +143,8 @@ static ErrorCode	packetHandler(		USBHandle usb,
 
 			(*API)->usb->hardware->EndpointReadSetup(gUSBAPIHandle, 0, (unsigned int*)&setupPacket);
 			
-			UART::writeSync("\nbR:");
-			UART::writeHexDumpSync((unsigned char const*)&setupPacket, sizeof(setupPacket));
+			//UART::writeSync("\nbR:");
+			//UART::writeHexDumpSync((unsigned char const*)&setupPacket, sizeof(setupPacket));
 			
 			gUSBState.lastSetupType = setupPacket.bmRequestType;
 
@@ -180,11 +184,7 @@ static ErrorCode	packetHandler(		USBHandle usb,
 		}
 		else if((gUSBState.lastSetupType & USBSetup_Recipient__Mask) == USBSetup_Recipient_Device)	// possibly prompt the next endpoint IN write to occur
 		{
-			UART::writeSync(" IN type:");
-			UART::writeSync(gUSBState.lastSetupType & USBSetup_Type__Mask, NumberFormatter::Hexadecimal);
-			UART::writeSync(": ");
 			Handler* h = findHandlerForDescriptor((USBDescriptorHeader const*)closure);
-			
 			if(h != 0)
 				return(h->handler(h->context, (USBDescriptorHeader const*)closure, 0));
 		}
@@ -199,9 +199,6 @@ static ErrorCode	packetHandler(		USBHandle usb,
 			}
 			else
 			{
-				UART::writeSync(" OUT type:");
-				UART::writeSync(gUSBState.lastSetupType & USBSetup_Type__Mask, NumberFormatter::Hexadecimal);
-				UART::writeSync(": ");
 				Handler* h = findHandlerForDescriptor((USBDescriptorHeader const*)closure);
 
 				if(h != 0)
@@ -218,13 +215,7 @@ static ErrorCode	standardSetupHandler(void* context, USBDescriptorHeader const* 
 {
 	if(setupPacket == 0)	// is an OUT packet
 	{
-		unsigned char buffer[64];
-		unsigned int bytesRead = (*API)->usb->hardware->EndpointRead(gUSBAPIHandle, 0, buffer);
-		UART::writeSync(" srd:");
-		UART::writeSync(bytesRead, NumberFormatter::DecimalUnsigned);
-		UART::writeSync(">");
-		UART::writeHexDumpSync(buffer, bytesRead);
-
+		// OUT packets to EP0 seem to be completely empty, perhaps a ROM API anomaly?
 		return(ErrorCode_OK);
 	}
 
@@ -232,17 +223,14 @@ static ErrorCode	standardSetupHandler(void* context, USBDescriptorHeader const* 
 	switch(setupPacket->bRequest)
 	{
 	case USBDeviceRequest_ClearFeature:
-		UART::writeSync(":cf:");
-		UART::writeSync((unsigned int)setupPacket->wValue, NumberFormatter::Hexadecimal);
+		// feature in setupPacket->wValue
 		return(ErrorCode_SendZeroLengthPacket);
 
 	case USBDeviceRequest_SetFeature:
-		UART::writeSync(":sf:");
-		UART::writeSync((unsigned int)setupPacket->wValue, NumberFormatter::Hexadecimal);
+		// feature in setupPacket->wValue
+		return(ErrorCode_SendZeroLengthPacket);
 
 	case USBDeviceRequest_SetAddress:
-		UART::writeSync(":sa");
-		
 		gUSBState.taskParameter = setupPacket->wValue;
 		gUSBState.task = USBTask_ChangeAddressPending;
 		
@@ -250,8 +238,6 @@ static ErrorCode	standardSetupHandler(void* context, USBDescriptorHeader const* 
 
 	case USBDeviceRequest_GetDescriptor:
 		{
-			UART::writeSync(":dd");
-			
 			unsigned char const* descriptor = 0;	// determine the right one to send
 			size_t descriptorLength = 0;
 
@@ -275,10 +261,6 @@ static ErrorCode	standardSetupHandler(void* context, USBDescriptorHeader const* 
 				break;
 			}
 
-			UART::writeSync("\n<");
-			UART::writeSync((unsigned int)descriptor, NumberFormatter::Hexadecimal);
-			UART::writeSync("<");
-			
 			// get the Nth descriptor of the right type from the array
 			descriptor = findNthDescriptor(		descriptor,
 												descriptorLength,
@@ -296,12 +278,6 @@ static ErrorCode	standardSetupHandler(void* context, USBDescriptorHeader const* 
 			if(setupPacket->wLength < descriptorLength)
 				descriptorLength = setupPacket->wLength;
 			
-			UART::writeSync((unsigned int)descriptor, NumberFormatter::Hexadecimal);
-			UART::writeSync("<");
-			UART::writeSync(descriptorLength, NumberFormatter::DecimalUnsigned);
-			UART::writeSync("<");
-			UART::writeHexDumpSync(descriptor, descriptorLength);
-			
 			(*API)->usb->hardware->EndpointWrite(	gUSBAPIHandle,
 													0x80,
 													(unsigned char*)descriptor,
@@ -311,7 +287,6 @@ static ErrorCode	standardSetupHandler(void* context, USBDescriptorHeader const* 
 		return(ErrorCode_OK);
 
 	case USBDeviceRequest_GetConfiguration:
-		UART::writeSync(":gc");
 		(*API)->usb->hardware->EndpointWrite(	gUSBAPIHandle,
 												0x80,
 												(unsigned char*)"\x01",
@@ -321,8 +296,6 @@ static ErrorCode	standardSetupHandler(void* context, USBDescriptorHeader const* 
 
 	case USBDeviceRequest_SetConfiguration:
 		{
-			UART::writeSync(":sc");
-
 			(*API)->usb->hardware->SetConfiguration(	gUSBAPIHandle,
 														gUSBState.taskParameter
 													);
@@ -336,15 +309,9 @@ static ErrorCode	standardSetupHandler(void* context, USBDescriptorHeader const* 
 												index
 											)) != 0)
 			{
-				UART::writeSync("\ncfg#");
-				UART::writeSync(index, NumberFormatter::DecimalUnsigned);
-				UART::writeSync("@0x");
-				UART::writeSync((unsigned int)ep, NumberFormatter::Hexadecimal);
 				(*API)->usb->hardware->ConfigureEndpoint(gUSBAPIHandle, (USBDescriptorEndpoint*)ep);
 
 				unsigned int addr = ((USBDescriptorEndpoint*)ep)->endpointAddress;
-				UART::writeSync(", en:");
-				UART::writeSync(addr, NumberFormatter::Hexadecimal);
 				(*API)->usb->hardware->EnableEndpoint(gUSBAPIHandle, addr);
 
 				index++;
@@ -370,8 +337,6 @@ ErrorCode		USB::Interrupt(void)
 	switch(gUSBState.task)
 	{
 	case USBTask_ChangeAddress:
-		UART::writeSync("\nchg");
-		
 		// set the address on the USB controller manually
 		*USBDeviceCommandStatus |= (gUSBState.taskParameter & 0x7F);
 		
@@ -427,7 +392,7 @@ ErrorCode		USB::Start(void)
 	ErrorCode usbError = (*API)->usb->hardware->Init(&gUSBAPIHandle, &gUSBState.descriptors, &hardwareInit);
 	if(usbError != 0)
 	{
-		UART::writeSync("\ninit err: ");
+		UART::writeSync("\ninit error: ");
 		UART::writeSync(usbError, NumberFormatter::Hexadecimal);
 		return(usbError);
 	}
@@ -437,7 +402,7 @@ ErrorCode		USB::Start(void)
 												);
 	if(usbError != 0)
 	{
-		UART::writeSync("\nreg handlers err: ");
+		UART::writeSync("\nreg handlers error: ");
 		UART::writeSync(usbError, NumberFormatter::Hexadecimal);
 		return(usbError);
 	}
@@ -482,8 +447,6 @@ ErrorCode		USB::RegisterHandler(	void const* descriptor,
 		return(ErrorCode_TooManyHandlers);
 
 	// allocate a new handler
-	UART::writeSync("\nalloc ");
-	UART::writeSync(sizeof(Handler), NumberFormatter::DecimalUnsigned);
 	Handler* newHandler = new Handler();
 	newHandler->receiver = (USBDescriptorHeader const*)descriptor;
 	newHandler->handler = handler;
@@ -503,7 +466,6 @@ ErrorCode		USB::Connect(void)
 {
 	*InterruptEnableSet0 |= Interrupt0_USB;
 	(*API)->usb->hardware->Connect(gUSBAPIHandle, 1);
-	UART::writeSync("\nconnected");
 	return(ErrorCode_OK);
 }
 
@@ -511,7 +473,6 @@ void			USB::Disconnect(void)
 {
 	(*API)->usb->hardware->Connect(gUSBAPIHandle, 0);
 	*InterruptEnableSet0 &= ~Interrupt0_USB;
-	UART::writeSync("\ndisconnected");
 }
 
 

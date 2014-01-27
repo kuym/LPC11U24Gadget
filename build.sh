@@ -64,6 +64,5 @@ if [ $? == 0 ]; then
 	/usr/local/bin/node cortex-checksum.js < obj/unsigned.bin > obj/test.bin
 	arm-none-eabi-objdump -d obj/test.elf > obj/test.elf.disasm.txt
 
-	#echo vectors:
-	#dd if=obj/test.bin bs=32 count=1 | hexdump -C
+	arm-none-eabi-size obj/test.elf
 fi
