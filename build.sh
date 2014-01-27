@@ -6,10 +6,11 @@ if [ -f "toolpath" ]; then
 fi
 
 sources="\
-LPC11U00.cpp \
-LPC11U00API.cpp \
 libc.S \
 libc.cpp \
+LPC11U00.cpp \
+LPC11U00API.cpp \
+USBAPI.cpp \
 main.cpp \
 "
 
