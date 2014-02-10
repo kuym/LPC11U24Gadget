@@ -7,45 +7,50 @@
 #define WEAK_IGNORE __attribute__ ((weak, alias("ignoreInterrupt")))
 #define STARTUP	__attribute__ ((section(".startup"), used))
 
-extern "C" int main(void);
+extern "C"
+{
 
-extern "C" void ignoreInterrupt(void) INTERRUPT;
+	int main(void);
 
-extern "C" void _start(void) __attribute__ ((weak, alias("_gaunt_start"), used));
-extern "C" void _gaunt_start(void);
-extern "C" void HardFault_Handler(void) INTERRUPT;
-extern "C" void SVCall_Handler(void) WEAK_IGNORE;
-extern "C" void SysTick_Handler(void) WEAK_IGNORE;
+	void ignoreInterrupt(void) INTERRUPT;
 
-
-extern "C" void FLEX_INT0_IRQHandler(void) WEAK_IGNORE;
-extern "C" void FLEX_INT1_IRQHandler(void) WEAK_IGNORE;
-extern "C" void FLEX_INT2_IRQHandler(void) WEAK_IGNORE;
-extern "C" void FLEX_INT3_IRQHandler(void) WEAK_IGNORE;
-extern "C" void FLEX_INT4_IRQHandler(void) WEAK_IGNORE;
-extern "C" void FLEX_INT5_IRQHandler(void) WEAK_IGNORE;
-extern "C" void FLEX_INT6_IRQHandler(void) WEAK_IGNORE;
-extern "C" void FLEX_INT7_IRQHandler(void) WEAK_IGNORE;
-extern "C" void GINT0_IRQHandler(void) WEAK_IGNORE;
-extern "C" void GINT1_IRQHandler(void) WEAK_IGNORE;
-extern "C" void SSP1_IRQHandler(void) WEAK_IGNORE;
-extern "C" void I2C_IRQHandler(void) WEAK_IGNORE;
-extern "C" void TIMER16_0_IRQHandler(void) WEAK_IGNORE;
-extern "C" void TIMER16_1_IRQHandler(void) WEAK_IGNORE;
-extern "C" void TIMER32_0_IRQHandler(void) WEAK_IGNORE;
-extern "C" void TIMER32_1_IRQHandler(void) WEAK_IGNORE;
-extern "C" void SSP0_IRQHandler(void) WEAK_IGNORE;
-extern "C" void UART_IRQHandler(void) WEAK_IGNORE;
-extern "C" void USB_IRQHandler(void) WEAK_IGNORE;
-extern "C" void USB_FIQHandler(void) WEAK_IGNORE;
-extern "C" void ADC_IRQHandler(void) WEAK_IGNORE;
-extern "C" void WDT_IRQHandler(void) WEAK_IGNORE;
-extern "C" void BOD_IRQHandler(void) WEAK_IGNORE;
-extern "C" void FMC_IRQHandler(void) WEAK_IGNORE;
-extern "C" void USBWakeup_IRQHandler(void) WEAK_IGNORE;
+	void _start(void) __attribute__ ((weak, alias("_gaunt_start"), used));
+	void _gaunt_start(void);
+	void HardFault_Handler(void) INTERRUPT;
+	void SVCall_Handler(void) WEAK_IGNORE;
+	void SysTick_Handler(void) WEAK_IGNORE;
 
 
-typedef void (*IRQVector)(void);
+	void FLEX_INT0_IRQHandler(void) WEAK_IGNORE;
+	void FLEX_INT1_IRQHandler(void) WEAK_IGNORE;
+	void FLEX_INT2_IRQHandler(void) WEAK_IGNORE;
+	void FLEX_INT3_IRQHandler(void) WEAK_IGNORE;
+	void FLEX_INT4_IRQHandler(void) WEAK_IGNORE;
+	void FLEX_INT5_IRQHandler(void) WEAK_IGNORE;
+	void FLEX_INT6_IRQHandler(void) WEAK_IGNORE;
+	void FLEX_INT7_IRQHandler(void) WEAK_IGNORE;
+	void GINT0_IRQHandler(void) WEAK_IGNORE;
+	void GINT1_IRQHandler(void) WEAK_IGNORE;
+	void SSP1_IRQHandler(void) WEAK_IGNORE;
+	void I2C_IRQHandler(void) WEAK_IGNORE;
+	void TIMER16_0_IRQHandler(void) WEAK_IGNORE;
+	void TIMER16_1_IRQHandler(void) WEAK_IGNORE;
+	void TIMER32_0_IRQHandler(void) WEAK_IGNORE;
+	void TIMER32_1_IRQHandler(void) WEAK_IGNORE;
+	void SSP0_IRQHandler(void) WEAK_IGNORE;
+	void UART_IRQHandler(void) WEAK_IGNORE;
+	void USB_IRQHandler(void) WEAK_IGNORE;
+	void USB_FIQHandler(void) WEAK_IGNORE;
+	void ADC_IRQHandler(void) WEAK_IGNORE;
+	void WDT_IRQHandler(void) WEAK_IGNORE;
+	void BOD_IRQHandler(void) WEAK_IGNORE;
+	void FMC_IRQHandler(void) WEAK_IGNORE;
+	void USBWakeup_IRQHandler(void) WEAK_IGNORE;
+
+
+	typedef void (*IRQVector)(void);
+
+}
 
 //this is named "null" as a debugging enhancement and because nothing should depend on this symbol
 extern "C"
@@ -260,6 +265,12 @@ extern "C" void STARTUP Reset(void)
 
 extern "C" void STARTUP INTERRUPT ignoreInterrupt(void)
 {
+	unsigned int activeInterrupt = (*LPC11U00::InterruptControlAndState & LPC11U00::ActiveVector__Mask);
+
+	if(activeInterrupt > 16)
+		activeInterrupt -= 16;
+	writeSync("\nUnhandledInt #");
+	writeSync(activeInterrupt);
 }
 
 extern void* __attribute__ ((weak, alias("__dso_handle_nostdlib"))) __dso_handle;

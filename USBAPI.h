@@ -1,8 +1,10 @@
 #ifndef __USBAPI_H__
 #define __USBAPI_H__
 
-#include <LPCUSB.h>
-using namespace LPCUSB;
+#include <LPC11U00.h>
+
+using namespace LPC11U00;
+using namespace LPC11U00::ROMUSB;
 
 typedef ErrorCode (*USBHandler)(	void* context,
 									USBDescriptorHeader const* descriptor,
