@@ -1,0 +1,23 @@
+Raw Descriptor (hex)	0000: 09 02 20 00 01 01 00 C0  32 09 04 00 00 02 08 06  
+Raw Descriptor (hex)	0010: 50 04 07 05 81 02 40 00  00 07 05 01 02 40 00 00  
+Unknown Descriptor		0020: 
+Number of Interfaces:   1
+Configuration Value:   1
+Attributes:   0xC0 (self-powered)
+MaxPower:   100 ma
+Interface #0 - Mass Storage/SCSI ..............................................   "Memory"
+	Alternate Setting   0
+	Number of Endpoints   2
+	Interface Class:   8   (Mass Storage)
+	Interface Subclass;   6   (SCSI)
+	Interface Protocol:   80
+	Endpoint 0x81 - Bulk Input   
+		Address:   0x81  (IN)
+		Attributes:   0x02  (Bulk no synchronization data endpoint)
+		Max Packet Size:   64
+		Polling Interval:   0 ms
+	Endpoint 0x01 - Bulk Output   
+		Address:   0x01  (OUT)
+		Attributes:   0x02  (Bulk no synchronization data endpoint)
+		Max Packet Size:   64
+		Polling Interval:   0 ms
