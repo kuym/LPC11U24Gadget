@@ -1,12 +1,10 @@
 #include <LPC11U00.h>
 #include <LPC11U00API.h>
-#include <LPCUSB.h>
 #include <USBAPI.h>
 #include <USBCDC.h>
 #include <string.h>
 
 using namespace LPC11U00;
-using namespace LPCUSB;
 
 ////////////////////////////////////////////////////////////////
 
@@ -163,6 +161,7 @@ ErrorCode	USBCDCACMHandler(void* context, USBDescriptorHeader const* endpoint, U
 	if(endpointAddress == 0)
 	{
 		UART::writeSync("\ncls:");
+		UART::writeHexDumpSync((unsigned char*)setupPacket, sizeof(USBSetup));
 	}
 	else
 	{
@@ -241,12 +240,12 @@ ErrorCode	USBCDCACMHandler(void* context, USBDescriptorHeader const* endpoint, U
 			break;
 		}
 	}
-	else if(endpointAddress == 0x03)	// endpoint 0x03 OUT
+	else if(endpointAddress == 0x02)	// endpoint 0x02 OUT
 	{
 		unsigned char buffer[64];
 		unsigned int bytesRead = USB::Read(endpointAddress, buffer);
 		
-		UART::writeSync("\nep3 rd:");
+		UART::writeSync("\nep2 rd:");
 		UART::writeSync(bytesRead, NumberFormatter::DecimalUnsigned);
 		UART::writeSync(">");
 		UART::writeHexDumpSync(buffer, bytesRead);
@@ -259,7 +258,29 @@ ErrorCode	USBCDCACMHandler(void* context, USBDescriptorHeader const* endpoint, U
 						bytesRead
 					);
 	}
-	else if(endpointAddress == 0x83)	// endpoint 0x83 IN
+	else if(endpointAddress == 0x82)	// endpoint 0x82 IN
+	{
+		// anything additional to send in to the host?
+	}
+	else if(endpointAddress == 0x04)	// endpoint 0x04 OUT
+	{
+		unsigned char buffer[64];
+		unsigned int bytesRead = USB::Read(endpointAddress, buffer);
+		
+		UART::writeSync("\nep4 rd:");
+		UART::writeSync(bytesRead, NumberFormatter::DecimalUnsigned);
+		UART::writeSync(">");
+		UART::writeHexDumpSync(buffer, bytesRead);
+
+		// echo with '|'
+		buffer[bytesRead++] = '|';
+
+		USB::Write(		0x80 | endpointAddress,
+						buffer,
+						bytesRead
+					);
+	}
+	else if(endpointAddress == 0x84)	// endpoint 0x84 IN
 	{
 		// anything additional to send in to the host?
 	}
@@ -267,7 +288,7 @@ ErrorCode	USBCDCACMHandler(void* context, USBDescriptorHeader const* endpoint, U
 	return(ErrorCode_OK);
 }
 
-void	USB_IRQHandler(void)
+extern "C" void		USB_IRQHandler(void)
 {
 	USB::Interrupt();
 }
@@ -325,7 +346,7 @@ int main(void)
 		
 		/*if(cdcDeviceState.connected)	//@@HACK!
 			(*API)->usb->hardware->EndpointWrite(	gUSBAPIHandle,
-													0x83,
+													0x82,
 													(unsigned char*)"\nhello :-)",
 													10
 												);

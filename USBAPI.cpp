@@ -1,12 +1,12 @@
 #include <LPC11U00.h>
 #include <LPC11U00API.h>
-#include <LPCUSB.h>
 #include <USBAPI.h>
 #include <USBCDC.h>
 #include <string.h>
 
 using namespace LPC11U00;
-using namespace LPCUSB;
+using namespace LPC11U00::ROMUSB;
+using namespace LPC11U00::ROMAPI;
 
 
 enum USBTask
@@ -143,8 +143,8 @@ static ErrorCode	packetHandler(		USBHandle usb,
 
 			(*API)->usb->hardware->EndpointReadSetup(gUSBAPIHandle, 0, (unsigned int*)&setupPacket);
 			
-			//UART::writeSync("\nbR:");
-			//UART::writeHexDumpSync((unsigned char const*)&setupPacket, sizeof(setupPacket));
+			UART::writeSync("\nbR:");
+			UART::writeHexDumpSync((unsigned char const*)&setupPacket, sizeof(setupPacket));
 			
 			gUSBState.lastSetupType = setupPacket.bmRequestType;
 
@@ -309,9 +309,11 @@ static ErrorCode	standardSetupHandler(void* context, USBDescriptorHeader const* 
 												index
 											)) != 0)
 			{
+				unsigned int addr = ((USBDescriptorEndpoint*)ep)->endpointAddress;
+				UART::writeSync("\nenEP");
+				UART::writeSync(addr, NumberFormatter::Hexadecimal);
 				(*API)->usb->hardware->ConfigureEndpoint(gUSBAPIHandle, (USBDescriptorEndpoint*)ep);
 
-				unsigned int addr = ((USBDescriptorEndpoint*)ep)->endpointAddress;
 				(*API)->usb->hardware->EnableEndpoint(gUSBAPIHandle, addr);
 
 				index++;
@@ -384,9 +386,9 @@ ErrorCode		USB::Start(void)
 	//USB setup
 	HardwareInit hardwareInit = {0};
 	hardwareInit.usbRegisterBase = 0x40080000;
-	hardwareInit.memBase = 0x20004800;	//should be 0x20004000 according to the datashee
+	hardwareInit.memBase = 0x20004800;	//should be 0x20004000 according to the datasheet
 	hardwareInit.memSize = 0x2000;
-	hardwareInit.maxNumEndpoints = 5;
+	hardwareInit.maxNumEndpoints = 7;	//@@make parametric
 
 	gUSBAPIHandle = 0;
 	ErrorCode usbError = (*API)->usb->hardware->Init(&gUSBAPIHandle, &gUSBState.descriptors, &hardwareInit);
@@ -444,7 +446,10 @@ ErrorCode		USB::RegisterHandler(	void const* descriptor,
 	while((h != 0) && (h->receiver != (USBDescriptorHeader const*)descriptor))
 		h = h->next;
 	if(h != 0)
+	{
+		UART::writeSync("\nreg: duplicate handler");
 		return(ErrorCode_TooManyHandlers);
+	}
 
 	// allocate a new handler
 	Handler* newHandler = new Handler();
