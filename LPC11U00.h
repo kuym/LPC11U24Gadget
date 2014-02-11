@@ -42,6 +42,12 @@
 			
 			IOConfigPIO_InvertInput				=	(0x01 << 6),
 			
+			IOConfigPIO_AnalogMask				=	(0x03 << 7),
+
+			IOConfigPIO_DigitalMode				=	(0x01 << 7),
+			
+			IOConfigPIO_GlitchFilter			=	(0x01 << 8),
+
 			IOConfigPIO_OpenDrain				=	(0x01 << 10),
 		};
 
@@ -51,7 +57,7 @@
 			IOConfigPIO0_0_Function_nReset		=	(0x00 << 0),
 			IOConfigPIO0_0_Function_PIO			=	(0x01 << 0),
 
-			IOConfigPIO0_0_Supported			=	(0x3F | IOConfigPIO_OpenDrain)
+			IOConfigPIO0_0_Supported			=	(0x7F | IOConfigPIO_OpenDrain)
 		};
 
 	REGISTER IOConfigPIO0_1		= REGISTER_ADDRESS(0x40044004);
@@ -60,19 +66,30 @@
 			IOConfigPIO0_1_Function_PIO			=	(0x00 << 0),
 			IOConfigPIO0_1_Function_ClockOutput	=	(0x01 << 0),
 			IOConfigPIO0_1_Function_T2_M2		=	(0x02 << 0),
-			IOConfigPIO0_1_Function_USB_Toggle	=	(0x03 << 0),
+			IOConfigPIO0_1_Function_USBToggle	=	(0x03 << 0),
 
-			IOConfigPIO0_1_Supported			=	(0x3F | IOConfigPIO_OpenDrain)
+			IOConfigPIO0_1_Supported			=	(0x7F | IOConfigPIO_OpenDrain)
 		};
 		
-	REGISTER IOConfigPIO0_3		= REGISTER_ADDRESS(0x40044010);
+	REGISTER IOConfigPIO0_2		= REGISTER_ADDRESS(0x40044008);
+		enum IOConfigPIO0_2
+		{
+			IOConfigPIO0_2_Function_PIO			=	(0x00 << 0),
+			IOConfigPIO0_2_Function_SSEL0		=	(0x01 << 0),
+			IOConfigPIO0_2_Function_T0_C0		=	(0x02 << 0),
+			IOConfigPIO0_2_Function_IOH_2		=	(0x03 << 0),
+
+			IOConfigPIO0_2_Supported			=	(0x7F | IOConfigPIO_OpenDrain)
+		};
+		
+	REGISTER IOConfigPIO0_3		= REGISTER_ADDRESS(0x4004400C);
 		enum IOConfigPIO0_3
 		{
 			IOConfigPIO0_3_Function_PIO			=	(0x00 << 0),
 			IOConfigPIO0_3_Function_VBUS		=	(0x01 << 0),
 			IOConfigPIO0_3_Function_IOH_1		=	(0x02 << 0),
 
-			IOConfigPIO0_3_Supported			=	(0x3F | IOConfigPIO_OpenDrain)
+			IOConfigPIO0_3_Supported			=	(0x7F | IOConfigPIO_OpenDrain)
 		};
 
 	REGISTER IOConfigPIO0_4		= REGISTER_ADDRESS(0x40044010);
@@ -103,6 +120,39 @@
 			IOConfigPIO0_5_Supported			=	(0x03 | (0x03 << 8))
 		};
 		
+	REGISTER IOConfigPIO0_6		= REGISTER_ADDRESS(0x40044018);
+		enum IOConfigPIO0_6
+		{
+			IOConfigPIO0_6_Function_PIO			=	(0x00 << 0),
+			IOConfigPIO0_6_Function_nUSBConnect	=	(0x01 << 0),
+			IOConfigPIO0_6_Function_SCK0		=	(0x02 << 0),
+			IOConfigPIO0_6_Function_IOH_4		=	(0x03 << 0),
+
+			IOConfigPIO0_6_Supported			=	(0x7F | IOConfigPIO_OpenDrain)
+		};
+
+	REGISTER IOConfigPIO0_8		= REGISTER_ADDRESS(0x40044020);
+		enum IOConfigPIO0_8
+		{
+			IOConfigPIO0_8_Function_PIO			=	(0x00 << 0),
+			IOConfigPIO0_8_Function_MISO0		=	(0x01 << 0),
+			IOConfigPIO0_8_Function_T0_M0		=	(0x02 << 0),
+			IOConfigPIO0_8_Function_IOH_6		=	(0x03 << 0),
+
+			IOConfigPIO0_8_Supported			=	(0x7F | IOConfigPIO_OpenDrain)
+		};
+
+	REGISTER IOConfigPIO0_9		= REGISTER_ADDRESS(0x40044024);
+		enum IOConfigPIO0_9
+		{
+			IOConfigPIO0_9_Function_PIO			=	(0x00 << 0),
+			IOConfigPIO0_9_Function_MOSI0		=	(0x01 << 0),
+			IOConfigPIO0_9_Function_T0_M1		=	(0x02 << 0),
+			IOConfigPIO0_9_Function_IOH_7		=	(0x03 << 0),
+
+			IOConfigPIO0_9_Supported			=	(0x7F | IOConfigPIO_OpenDrain)
+		};
+
 	REGISTER IOConfigPIO0_18	= REGISTER_ADDRESS(0x40044048);
 		enum IOConfigPIO0_18
 		{
@@ -110,7 +160,7 @@
 			IOConfigPIO0_18_Function_RXD		=	(0x01 << 0),
 			IOConfigPIO0_18_Function_T2_M0		=	(0x02 << 0),
 			
-			IOConfigPIO0_18_Supported			=	(0x3F | IOConfigPIO_OpenDrain)
+			IOConfigPIO0_18_Supported			=	(0x7F | IOConfigPIO_OpenDrain)
 		};
 
 	REGISTER IOConfigPIO0_19	= REGISTER_ADDRESS(0x4004404C);
@@ -120,9 +170,51 @@
 			IOConfigPIO0_19_Function_TXD		=	(0x01 << 0),
 			IOConfigPIO0_19_Function_T2_M1		=	(0x02 << 0),
 			
-			IOConfigPIO0_19_Supported			=	(0x3F)
+			IOConfigPIO0_19_Supported			=	(0x7F | IOConfigPIO_OpenDrain)
 		};
 	
+	REGISTER IOConfigPIO0_21	= REGISTER_ADDRESS(0x40044054);
+		enum IOConfigPIO0_21
+		{
+			IOConfigPIO0_21_Function_PIO		=	(0x00 << 0),
+			IOConfigPIO0_21_Function_T1_M0		=	(0x01 << 0),
+			IOConfigPIO0_21_Function_MOSI1		=	(0x02 << 0),
+
+			IOConfigPIO0_21_Supported			=	(0x7F | IOConfigPIO_OpenDrain)
+		};
+
+	REGISTER IOConfigPIO0_22	= REGISTER_ADDRESS(0x40044058);
+		enum IOConfigPIO0_22
+		{
+			IOConfigPIO0_22_Function_PIO		=	(0x00 << 0),
+			IOConfigPIO0_22_Function_AD6		=	(0x01 << 0),
+			IOConfigPIO0_22_Function_T1_M1		=	(0x02 << 0),
+			IOConfigPIO0_22_Function_MISO1		=	(0x03 << 0),
+
+			IOConfigPIO0_22_Supported			=	(0x7F | IOConfigPIO_AnalogMask | IOConfigPIO_OpenDrain)
+		};
+
+
+	REGISTER IOConfigPIO1_15	= REGISTER_ADDRESS(0x4004409C);
+		enum IOConfigPIO1_15
+		{
+			IOConfigPIO1_15_Function_PIO		=	(0x00 << 0),
+			IOConfigPIO1_15_Function_nDCD		=	(0x01 << 0),
+			IOConfigPIO1_15_Function_T0_M2		=	(0x02 << 0),
+			IOConfigPIO1_15_Function_SCK1		=	(0x03 << 0),
+
+			IOConfigPIO0_15_Supported			=	(0x7F | IOConfigPIO_OpenDrain)
+		};
+
+	REGISTER IOConfigPIO1_19	= REGISTER_ADDRESS(0x400440AC);
+		enum IOConfigPIO1_19
+		{
+			IOConfigPIO1_19_Function_PIO		=	(0x00 << 0),
+			IOConfigPIO1_19_Function_nDTR		=	(0x01 << 0),
+			IOConfigPIO1_19_Function_SSEL1		=	(0x02 << 0),
+
+			IOConfigPIO1_19_Supported			=	(0x7F | IOConfigPIO_OpenDrain)
+		};
 
 	////////////////////////////////////////////////////////////////
 

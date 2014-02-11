@@ -86,4 +86,47 @@ public:
 	static void				flush(void);
 };
 
+////////////////////////////////////////////////////////////////
+// SPI
+
+class SPI
+{
+public:
+	typedef enum
+	{
+		Master,
+		Slave,
+	} Role;
+	
+	enum
+	{
+		CharsAre4Bit	=	(0x03),
+		CharsAre5Bit	=	(0x04),
+		CharsAre6Bit	=	(0x05),
+		CharsAre7Bit	=	(0x06),
+		CharsAre8Bit	=	(0x07),
+		CharsAre9Bit	=	(0x08),
+		CharsAre10Bit	=	(0x09),
+		CharsAre11Bit	=	(0x0A),
+		CharsAre12Bit	=	(0x0B),
+		CharsAre13Bit	=	(0x0C),
+		CharsAre14Bit	=	(0x0D),
+		CharsAre15Bit	=	(0x0E),
+		CharsAre16Bit	=	(0x0F),
+		
+		Mode0			= (0x00 << 6),	//SCK idles low, data changed on SCK's falling edge, read on rising edge.
+		Mode1			= (0x02 << 6),	//SCK idles low, data changed on SCK's rising edge, read on falling edge.
+		Mode2			= (0x01 << 6),	//SCK idles high, data changed on SCK's falling edge, read on rising edge.
+		Mode3			= (0x03 << 6),	//SCK idles high, data changed on SCK's rising edge, read on falling edge.
+		
+		Default			= (CharsAre8Bit | Mode0),
+	};
+	typedef int Mode;
+	
+	void			start(int bitRate, Mode mode, Role role);
+
+private:
+	unsigned int	deviceNum;
+};
+
 #endif //_LPC11U00API_H_

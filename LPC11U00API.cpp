@@ -275,3 +275,112 @@ void				UART::flush(void)
 
 
 ////////////////////////////////////////////////////////////////
+
+
+void			SPI::start(int bitRate, Mode mode, Role role)
+{
+	//assert reset
+	if(deviceNum == 0)
+		*PeripheralnReset &= ~PeripheralnReset_SPI0;
+	else
+		*PeripheralnReset &= ~PeripheralnReset_SPI1;
+
+	if(bitRate > 0)
+	{
+		if(deviceNum == 0)
+		{
+			*ClockControl |= ClockControl_SPI0;	//enable SPI0 clock
+			*SPI0ClockDivider = 1;
+			*PeripheralnReset |= PeripheralnReset_SPI0;	//deassert reset
+		}
+		else
+		{
+			*ClockControl |= ClockControl_SPI1;	//enable SPI1 clock
+			*SPI1ClockDivider = 1;
+			*PeripheralnReset |= PeripheralnReset_SPI1;	//deassert reset
+		}
+		
+		//This finds three prescalers, A, B and C such that (Fcpu / (A + 1) / B / C) = bitRate, where C is an even number 2 to 254.
+		// so as to avoid factoring, we cheat here by extracting an 8-bit mantissa (A) and computing 2^exponent, expressed in B and C
+		
+		unsigned int divisor = (System::getCoreFrequency() / bitRate) >> 1;
+		unsigned int magnitude = 32 - __builtin_clz(divisor);
+		unsigned int scale = 0, prescale = 2;
+		
+		if(magnitude > 8)
+		{
+			if(magnitude > 16)
+			{
+				prescale = 1 << (magnitude - 15);
+				magnitude = 16;
+			}
+			divisor >>= (magnitude - 8); //set mantissa
+			
+			scale = ((1 << (magnitude - 8)) - 1);
+		}
+		else
+			scale = 0;
+		
+		if(deviceNum == 0)
+		{
+			*SPI0Control0 = (scale << 8) | mode;
+			*SPI0Control1 = SPI0Control1_Enable;
+			*SPI0ClockPrescaler = prescale;
+			*SPI0ClockDivider = divisor - 1;
+
+			*IOConfigPIO0_6 = (*IOConfigPIO0_6 & ~IOConfigPIO_FunctionMask) | IOConfigPIO0_6_Function_SCK0;
+			*IOConfigPIO0_8 = (*IOConfigPIO0_8 & ~IOConfigPIO_FunctionMask) | IOConfigPIO0_8_Function_MISO0;
+			*IOConfigPIO0_9 = (*IOConfigPIO0_9 & ~IOConfigPIO_FunctionMask) | IOConfigPIO0_9_Function_MOSI0;
+			*IOConfigPIO0_2 = (*IOConfigPIO0_2 & ~IOConfigPIO_FunctionMask) | IOConfigPIO0_2_Function_SSEL0;
+			
+			*InterruptEnableSet0 = Interrupt0_SPI0;
+		}
+		else
+		{
+			*SPI1Control0 = (scale << 8) | mode;
+			*SPI1Control1 = SPI1Control1_Enable;
+			*SPI1ClockPrescaler = prescale;
+			*SPI1ClockDivider = divisor - 1;
+
+			*IOConfigPIO1_15 = (*IOConfigPIO1_15 & ~IOConfigPIO_FunctionMask) | IOConfigPIO1_15_Function_SCK1;
+			*IOConfigPIO0_22 = (*IOConfigPIO0_22 & ~IOConfigPIO_FunctionMask) | IOConfigPIO0_22_Function_MISO1;
+			*IOConfigPIO0_21 = (*IOConfigPIO0_9 & ~IOConfigPIO_FunctionMask) | IOConfigPIO0_21_Function_MOSI1;
+			*IOConfigPIO1_19 = (*IOConfigPIO1_19 & ~IOConfigPIO_FunctionMask) | IOConfigPIO1_19_Function_SSEL1;
+			
+			*InterruptEnableSet0 = Interrupt0_SPI1;
+		}
+	}
+	else
+	{
+		if(deviceNum == 0)
+		{
+			*ClockControl &= ~ClockControl_SPI0;	//disable SPI0 clock
+			*InterruptEnableClear0 = Interrupt0_SPI0;
+			*SPI0InterruptClear = 0x0F;	//disable interrupts
+
+			*IOConfigPIO0_6 = (*IOConfigPIO0_6 & ~IOConfigPIO_FunctionMask);
+			*IOConfigPIO0_8 = (*IOConfigPIO0_8 & ~IOConfigPIO_FunctionMask);
+			*IOConfigPIO0_9 = (*IOConfigPIO0_9 & ~IOConfigPIO_FunctionMask);
+			*IOConfigPIO0_2 = (*IOConfigPIO0_2 & ~IOConfigPIO_FunctionMask);
+		}
+		else
+		{
+			*ClockControl &= ~ClockControl_SPI1;	//disable SPI0 clock
+			*InterruptEnableClear0 = Interrupt0_SPI1;
+			*SPI1InterruptClear = 0x0F;	//disable interrupts
+			
+			*IOConfigPIO1_15 = (*IOConfigPIO1_15 & ~IOConfigPIO_FunctionMask);
+			*IOConfigPIO0_22 = (*IOConfigPIO0_22 & ~IOConfigPIO_FunctionMask);
+			*IOConfigPIO0_21 = (*IOConfigPIO0_9 & ~IOConfigPIO_FunctionMask);
+			*IOConfigPIO1_19 = (*IOConfigPIO1_19 & ~IOConfigPIO_FunctionMask);
+		}
+		
+		/*
+			InterruptFreeEnter();
+			
+				IOCore.flushQueue((IOCore::TaskQueueItem**)&IOCore.spiCurrentTask);
+			
+			InterruptFreeLeave();
+		*/
+	}
+}
