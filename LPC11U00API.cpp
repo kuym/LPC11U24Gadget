@@ -63,6 +63,159 @@ int		NumberFormatter::format(char* output, unsigned int number, int fractionBits
 	return(len);
 }
 
+////////////////////////////////////////////////////////////////
+// CircularBuffer
+
+			CircularBuffer::CircularBuffer(int bufferSize)
+{
+	bufferSize = (unsigned short)bufferSize;
+	buffer = new unsigned char[bufferSize];
+	
+	((unsigned short*)buffer)[1] = bufferSize;
+	((unsigned short*)buffer)[1] = 0;
+	((unsigned short*)buffer)[2] = 0;
+}
+
+//  returns the number of bytes occupied (available for reading) in this buffer
+int			CircularBuffer::used(void) const
+{
+	unsigned short	bufferSize = bsize(),
+					h = head(),
+					t = tail();
+
+	return((h >= t)? (h - t) : (bufferSize - (t - h)));
+}
+
+//  returns the number of bytes available for writing in this buffer
+int			CircularBuffer::free(void) const
+{
+	unsigned short	bufferSize = bsize(),
+					h = head(),
+					t = tail();
+
+	return((h >= t)? (bufferSize - (h - t) - 1) : (t - h - 1));
+}
+
+
+//  writes 'length' bytes from an input array ('in') into a circular buffer.  Returns
+//    the number of bytes written.
+//  'buffer' points at a circular buffer (see above)
+//  'bufferSize' is the size of this buffer (see above)
+int			CircularBuffer::write(unsigned char const* in, int length)
+{
+	unsigned short	bufferSize = bsize(),
+					h = head(),
+					t = tail(),
+					count = 0;
+
+	unsigned char volatile* b = bp() + h;
+
+	if(h >= t)
+	{
+		while(length && (h < bufferSize))
+		{
+			*b++ = *in++;
+			h++;
+			count++;
+			length--;
+		}
+		if(h == bufferSize)
+			h = 0;
+	}
+	if(length > 0)
+	{
+		b = buffer + h + 2;
+		
+		while(length-- && (h < (t - 1)))
+		{
+			*b++ = *in++;
+			h++;
+			count++;
+		}
+	}
+	
+	head() = h;
+	return(count);
+}
+
+int			CircularBuffer::writeByte(unsigned char b)
+{
+	unsigned short	bufferSize = bsize(),
+					h = head();
+	
+	if((h + 1) != tail())	// if we can fit it, write a byte
+	{
+		bp()[h] = b;
+		if(++h == bufferSize)	// roll the circular buffer around
+			h = 0;
+		head() = h;
+		return(1);
+	}
+	else
+		return(0);
+}
+
+//  reads 'length' bytes from a circular buffer into an output array ('out').  Returns
+//    the number of bytes read.
+//  'buffer' points at a circular buffer (see above)
+//  'bufferSize' is the size of this buffer (see above)
+int			CircularBuffer::read(unsigned char* out, int length)
+{
+	unsigned short	bufferSize = bsize(),
+					h = head(),
+					t = tail(),
+					count = 0;
+
+	unsigned char volatile* b;
+	
+	if(t > h)
+	{
+		b = bp() + t;
+		while(length && (t < bufferSize))
+		{
+			*out++ = *b++;
+			t++;
+			count++;
+			length--;
+		}
+		if(t == bufferSize)
+			t = 0;
+	}
+	if(length > 0)
+	{
+		b = bp() + t;
+		
+		while(length-- && (t < h))
+		{
+			*out++ = *b++;
+			t++;
+			count++;
+		}
+	}
+	
+	tail() = t;
+	return(count);
+}
+
+//  reads one byte from a circular buffer into an output byte ('b').  Returns 1 on success,
+//    0 on failure
+int			CircularBuffer::readByte(unsigned char* b)
+{
+	unsigned short	bufferSize = bsize(),
+					t = tail();
+
+	if(t != head())	// if we can spare a byte, read it
+	{
+		*b = bp()[t];
+		if(++t == bufferSize)	// roll the circular buffer around
+			t = 0;
+		tail() = t;
+		return(1);
+	}
+	else
+		return(0);
+}
+
 
 ////////////////////////////////////////////////////////////////
 // System

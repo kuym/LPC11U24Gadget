@@ -97,7 +97,7 @@ static inline unsigned int*	sp(void)
 	return(e);
 }
 
-void*			operator new(unsigned int size)
+void*			operator new[](unsigned int size)
 {
 	if(size == 0)
 		return((void*)~0);
@@ -137,7 +137,7 @@ void*			operator new(unsigned int size)
 	return((void*)~0);
 }
 
-void			operator delete(void* allocation)
+void			operator delete[](void* allocation)
 {
 	unsigned int* a = (unsigned int*)allocation;
 	unsigned int* e = sp() - 8;	//leave a 32-byte margin
@@ -176,3 +176,6 @@ void			operator delete(void* allocation)
 	*a = cbs;	//merge free blocks if contiguous
 	//InterruptFreeLeave();
 }
+
+void*			operator new(unsigned int size)		{return((void*)(new unsigned char[size]));}
+void			operator delete(void* allocation)	{delete (unsigned char*)allocation;}
