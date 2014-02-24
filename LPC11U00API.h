@@ -32,34 +32,65 @@ public:
 class CircularBuffer
 {
 public:
-	int				used() const;
-	int				free() const;
+	inline int	size() const	{return(_p[0]);}
+	inline int	used() const	{return(_p[2]);}
+	inline int	free() const	{return(_p[0] - _p[2]);}
+	
+				CircularBuffer(void);
+				~CircularBuffer(void);
+	
+	bool		alloc(int bufferSize);
+	void		dealloc(void);
+	void		reset(void);
+	
+	int			read(unsigned char* out, int length);
 
-					CircularBuffer(void);
-					~CircularBuffer(void);
-
-	bool			alloc(int bufferSize);
-	void			dealloc(void);
-	void			reset(void);
-
-	unsigned char	operator [](int offset) const;
-
-	int				write(unsigned char const* in, int length);
-	int				writeByte(unsigned char b);
-	int				read(unsigned char* out, int length);
-	int				readByte(unsigned char* b);
+	int			write(unsigned char const* in, int length);
 
 private:
-	inline unsigned short	bsize(void) const	{return(((unsigned short*)buffer)[0]);}
-	inline unsigned short	head(void) const	{return(((unsigned short*)buffer)[1]);}
-	inline unsigned short&	head(void)			{return(((unsigned short*)buffer)[1]);}
-	inline unsigned short	tail(void) const	{return(((unsigned short*)buffer)[2]);}
-	inline unsigned short&	tail(void)			{return(((unsigned short*)buffer)[2]);}
+	inline int				L(void) const
+	{
+		return(_p[0]);
+	}
+	inline unsigned char*	T(void) const
+	{
+		return(((unsigned char*)(_p + (3 * sizeof(unsigned short)))) + _p[1]);
+	}
+	inline int				U(void) const
+	{
+		return(_p[2]);
+	}
 	
-	inline unsigned char volatile const*	bp(void) const	{return(buffer + (3 * sizeof(unsigned short)));}
-	inline unsigned char volatile*			bp(void)		{return(buffer + (3 * sizeof(unsigned short)));}
+	inline unsigned char*	h(void) const
+	{
+		return(T() + _p[2] - (((_p[1] + _p[2]) > _p[0])? _p[0] : 0));
+	}
+	inline int				f(void) const
+	{
+		return(_p[0] - _p[2]);
+	}
+	inline int				tb(void) const
+	{
+		return(((_p[1] + _p[2]) < _p[0])? _p[2] : (_p[0] - _p[1]));
+	}
+	inline int				hb(void) const
+	{
+		return(((_p[1] + _p[2]) < _p[0])? (_p[0] - _p[2] - _p[1]) : (_p[0] - _p[2]));
+	}
 	
-	unsigned char volatile*	buffer;
+	inline void			T(int increment)
+	{
+		int v = _p[1] + increment;
+		if(v >= _p[0])	v -= _p[0];
+		_p[1] = v;
+		_p[2] -= increment;
+	}
+	inline void			h(int increment)
+	{
+		_p[2] += increment;
+	}
+	
+	unsigned short*	_p;
 };
 
 ////////////////////////////////////////////////////////////////

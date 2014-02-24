@@ -1,5 +1,6 @@
 #include <LPC11U00API.h>
 #include <LPC11U00.h>
+#include <string.h>
 
 using namespace LPC11U00;
 using namespace LPC11U00::ROMDivider;
@@ -68,199 +69,117 @@ int		NumberFormatter::format(char* output, unsigned int number, int fractionBits
 ////////////////////////////////////////////////////////////////
 // CircularBuffer
 
+// Inner workings: seven quantities are defined, three primary and
+//   four derived.  They are:
+//   L:  Length of circular buffer; stays constant throughout use
+//   T:  tail position, range [0, L)
+//   U:  used space, range [0, L)
+//   h:  head position, range [0, L); derived property
+//   f:  free space, range [0, L); derived
+//   tb: tail blocksize, range [0, L); how big a span could be read contiguously, derived
+//   hb: head blocksize, range [0, L); how big a span could be written contiguously, derived
+//
+// examples:
+//
+// [ ] [ ] [T] [X] [X] [X] [h] [ ] [ ] [ ]	// L = 10, T = 2, U = 4		"forwards"
+//   h = 6; f = 6; tb = 4; hb = 4
+// [X] [h] [ ] [ ] [ ] [ ] [ ] [T] [X] [X]	// L = 10, T = 7, U = 4		"backwards"
+//   h = 1; f = 6; tb = 3; hb = 6
+// [ ] [ ] [ ] [ ] [b] [ ] [ ] [ ] [ ] [ ]	// L = 10, T = 4, U = 0		"empty"
+//   h = 4; f = 10; tb = 0; hb = 6
+// [X] [X] [X] [B] [X] [X] [X] [X] [X] [X]	// L = 10, T = 3, U = 10	"full"
+//   h = 3, f = 0; tb = 7; hb = 0
+//
+// the derived relationships of each of f, h, tb, hb:
+//
+// .:   h = ((T + U) > L)? (T + U - L) : (T + U)
+//      f = L - U
+//      tb = ((T + U) < L)? U : (L - T)
+//      hb = ((T + U) < L)? (L - U - T) : (L - U);
 
-//  returns the number of bytes occupied (available for reading) in this buffer
-int			CircularBuffer::used() const
-{
-	unsigned short	bufferSize = bsize(),
-					h = head(),
-					t = tail();
-
-	return((h >= t)? (h - t) : (bufferSize - (t - h)));
-}
-
-//  returns the number of bytes available for writing in this buffer
-int			CircularBuffer::free() const
-{
-	unsigned short	bufferSize = bsize(),
-					h = head(),
-					t = tail();
-
-	return((h >= t)? (bufferSize - (h - t) - 1) : (t - h - 1));
-}
-
-unsigned char	CircularBuffer::operator [](int offset) const
-{
-	unsigned short	bufferSize = bsize();
-
-	offset += tail();
-	if(offset > bufferSize)
-		offset -= bufferSize;
-
-	return(bp()[offset]);
-}
-
-			CircularBuffer::CircularBuffer(void):
-				buffer(0)
-{
-}
-
-			CircularBuffer::~CircularBuffer(void)
+		CircularBuffer::CircularBuffer(void):
+			_p(0)
+{}
+		CircularBuffer::~CircularBuffer(void)
 {
 	dealloc();
 }
 
-bool		CircularBuffer::alloc(int bufferSize)
+bool	CircularBuffer::alloc(int bufferSize)
 {
 	dealloc();
 
-	// crop to 16-bit for this implementation
+	// crop to size for this implementation. This is adjustable
 	bufferSize = (unsigned short)bufferSize;
 	
 	// operator new may return 0 in this ABI
-	buffer = new unsigned char[(3 * sizeof(unsigned short)) + bufferSize];
-	if(buffer == 0)
+	_p = (unsigned short*)new unsigned char[(3 * sizeof(unsigned short)) + bufferSize];
+	if(_p == 0)
 		return(false);
 	
-	((unsigned short*)buffer)[0] = bufferSize;
-	head() = 0;
-	tail() = 0;
-
+	((unsigned short*)_p)[0] = bufferSize;
+	((unsigned short*)_p)[1] = 0;
+	((unsigned short*)_p)[2] = 0;
+	
 	return(true);
 }
 
-void		CircularBuffer::dealloc(void)
+void	CircularBuffer::dealloc(void)
 {
-	if(buffer != 0)
+	if(_p != 0)
 	{
-		delete[] buffer;
-		buffer = 0;
+		delete[] _p;
+		_p = 0;
 	}
 }
 
-void		CircularBuffer::reset(void)
+void	CircularBuffer::reset(void)
 {
-	head() = tail();
+	_p[2] = 0;
 }
 
-//  writes 'length' bytes from an input array ('in') into a circular buffer.  Returns
-//    the number of bytes written.
-//  'buffer' points at a circular buffer (see above)
-//  'bufferSize' is the size of this buffer (see above)
-int			CircularBuffer::write(unsigned char const* in, int length)
+int		CircularBuffer::read(unsigned char* out, int length)
 {
-	unsigned short	bufferSize = bsize(),
-					h = head(),
-					t = tail(),
-					count = 0;
-
-	unsigned char volatile* b = bp() + h;
-
-	if(h >= t)
-	{
-		while(length && (h < bufferSize))
-		{
-			*b++ = *in++;
-			h++;
-			count++;
-			length--;
-		}
-		if(h == bufferSize)
-			h = 0;
-	}
-	if(length > 0)
-	{
-		b = bp() + h;
-		
-		while(length-- && (h < (t - 1)))
-		{
-			*b++ = *in++;
-			h++;
-			count++;
-		}
-	}
+	if(length < 0)	length = 0;
+	int count = 0, b2, b1 = tb();
+	if(length < b1)	b1 = length;
+	memcpy(out, T(), b1);
+	T(b1);
+	out += b1;
+	length -= b1;
+	count += b1;
 	
-	head() = h;
+	if((length > 0) && ((b2 = tb()) > 0))
+	{
+		if(length < b2)	b2 = length;
+		memcpy(out, T(), b2);
+		count += b2;
+		T(b2);
+	}
 	return(count);
 }
 
-int			CircularBuffer::writeByte(unsigned char b)
+int		CircularBuffer::write(unsigned char const* in, int length)
 {
-	unsigned short	bufferSize = bsize(),
-					h = head();
+	if(length < 0)	length = 0;
+	int count = 0, b2, b1 = hb();
+	if(length < b1)	b1 = length;
+	memcpy(h(), in, b1);
+	h(b1);
+	in += b1;
+	length -= b1;
+	count += b1;
 	
-	if((h + 1) != tail())	// if we can fit it, write a byte
+	if((length > 0) && ((b2 = hb()) > 0))
 	{
-		bp()[h] = b;
-		if(++h == bufferSize)	// roll the circular buffer around
-			h = 0;
-		head() = h;
-		return(1);
+		if(length < b2)	b2 = length;
+		memcpy(h(), in, b2);
+		count += b2;
+		h(b2);
 	}
-	else
-		return(0);
-}
-
-//  reads 'length' bytes from a circular buffer into an output array ('out').  Returns
-//    the number of bytes read.
-//  'buffer' points at a circular buffer (see above)
-//  'bufferSize' is the size of this buffer (see above)
-int			CircularBuffer::read(unsigned char* out, int length)
-{
-	unsigned short	bufferSize = bsize(),
-					h = head(),
-					t = tail(),
-					count = 0;
-
-	unsigned char volatile* b;
-	
-	if(t > h)
-	{
-		b = bp() + t;
-		while(length && (t < bufferSize))
-		{
-			*out++ = *b++;
-			t++;
-			count++;
-			length--;
-		}
-		if(t == bufferSize)
-			t = 0;
-	}
-	if(length > 0)
-	{
-		b = bp() + t;
-		
-		while(length-- && (t < h))
-		{
-			*out++ = *b++;
-			t++;
-			count++;
-		}
-	}
-	
-	tail() = t;
 	return(count);
 }
 
-//  reads one byte from a circular buffer into an output byte ('b').  Returns 1 on success,
-//    0 on failure
-int			CircularBuffer::readByte(unsigned char* b)
-{
-	unsigned short	bufferSize = bsize(),
-					t = tail();
-
-	if(t != head())	// if we can spare a byte, read it
-	{
-		*b = bp()[t];
-		if(++t == bufferSize)	// roll the circular buffer around
-			t = 0;
-		tail() = t;
-		return(1);
-	}
-	else
-		return(0);
-}
 
 
 ////////////////////////////////////////////////////////////////
@@ -479,7 +398,7 @@ void				UART::flush(void)
 void			SPI::start(int bitRate, Mode mode, Role role)
 {
 	(void)role;	// not currently supported
-	
+
 	//assert reset
 	if(deviceNum == 0)
 		*PeripheralnReset &= ~PeripheralnReset_SPI0;
