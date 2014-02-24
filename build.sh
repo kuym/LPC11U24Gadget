@@ -60,6 +60,10 @@ arm-none-eabi-gcc -Wall -Wextra -nostdlib -nodefaultlibs -fno-exceptions \
 
 if [ $? == 0 ]; then
 	
+	echo "addr  length  F  name" > obj/test.elf.memmap.txt
+	echo "---- -------- - -------------------------------" >> obj/test.elf.memmap.txt
+	arm-none-eabi-nm -Sn obj/test.elf | grep -E "^1000" | arm-none-eabi-c++filt >> obj/test.elf.memmap.txt
+	
 	arm-none-eabi-objcopy -j .text -j .data -O binary obj/test.elf obj/unsigned.bin
 	/usr/local/bin/node cortex-checksum.js < obj/unsigned.bin > obj/test.bin
 	arm-none-eabi-objdump -d obj/test.elf > obj/test.elf.disasm.txt

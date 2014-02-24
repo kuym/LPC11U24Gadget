@@ -36,6 +36,7 @@ public:
 	static	void			Disconnect(void);
 	static	unsigned int	Read(unsigned int endpoint, unsigned char* dest);
 	static	unsigned int	Write(unsigned int endpoint, unsigned char* source, unsigned int length);
+	static	void			SetStall(unsigned int endpoint, bool stall);
 };
 
 #endif //!defined __USBAPI_H__

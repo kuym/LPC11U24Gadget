@@ -252,21 +252,11 @@ ErrorCode	USBCDCACMHandler(void* context, USBDescriptorHeader const* endpoint, U
 		UART::writeSync(">");
 		UART::writeHexDumpSync(buffer, bytesRead);
 
-		// echo with '|'
-		/*buffer[bytesRead++] = '|';
+		state->buffer.write(buffer, bytesRead);
 
-		USB::Write(		0x80 | endpointAddress,
-						buffer,
-						bytesRead
-					);
-		*/
-
-		int len = state->buffer.write(buffer, bytesRead);
-		
-		UART::writeSync("\nwrote:");
-		UART::writeSync(len, NumberFormatter::DecimalUnsigned);
-		UART::writeSync(", free:");
-		UART::writeSync(state->buffer.free(), NumberFormatter::DecimalUnsigned);
+		// if we couldn't accept another [endpoint size] bytes, stall the pipe
+		if(state->buffer.free() < 64)
+			USB::SetStall(0x03, true);
 	}
 	else if(endpointAddress == 0x83)	// endpoint 0x82 IN
 	{
@@ -337,16 +327,16 @@ int main(void)
 		//USB::Write(0x83, (unsigned char*)"hello :-)\n", 10);
 
 		int length = cdcDeviceState.buffer.used();
-
-		UART::writeSync("\nused:");
-		UART::writeSync(length, NumberFormatter::DecimalUnsigned);
-
 		if(cdcDeviceState.connected && (length > 0))
 		{
 			length = (length > 10)? 10 : length;
 			unsigned char miniBuffer[10];
 
 			cdcDeviceState.buffer.read(miniBuffer, length);
+
+			// if we couldn't accept another [endpoint size] bytes, stall the pipe
+			if(cdcDeviceState.buffer.free() >= 64)
+				USB::SetStall(0x03, false);
 
 			USB::Write(0x83, miniBuffer, length);
 		}

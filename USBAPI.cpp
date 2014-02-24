@@ -513,3 +513,11 @@ unsigned int	USB::Write(unsigned int endpoint, unsigned char* source, unsigned i
 {
 	return((*API)->usb->hardware->EndpointWrite(gUSBAPIHandle, endpoint, source, length));
 }
+
+void			USB::SetStall(unsigned int endpoint, bool stall)
+{
+	if(stall)
+		(*API)->usb->hardware->SetEndpointStall(gUSBAPIHandle, endpoint);
+	else
+		(*API)->usb->hardware->ClearEndpointStall(gUSBAPIHandle, endpoint);
+}

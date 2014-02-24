@@ -1,7 +1,7 @@
 extern "C" void exit(int reason)
 {
 	(void)reason;
-	
+
 	*((unsigned int volatile*)(0xE000ED0C)) = 0x05FA0004;   // invoke a hard reset
 	while(1);
 }
@@ -132,11 +132,11 @@ void*			operator new[](unsigned int size)
 		}
 		m += bs;
 	}
-	__asm volatile("bkpt 7"::);	//@@ Out-of-memory exception
+	//__asm volatile("bkpt 7"::);	//@@ Out-of-memory exception
 	
 	//effectively unreachable code:
 	//InterruptFreeLeave();
-	return((void*)~0);
+	return((void*)~0);	// this ABI may fail new
 }
 
 void			operator delete[](void* allocation)
