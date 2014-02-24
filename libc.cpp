@@ -1,6 +1,8 @@
 extern "C" void exit(int reason)
 {
-	*((unsigned int volatile*)(0xE000ED0C)) = 0x05FA0004;   //invoke a hard reset
+	(void)reason;
+	
+	*((unsigned int volatile*)(0xE000ED0C)) = 0x05FA0004;   // invoke a hard reset
 	while(1);
 }
 

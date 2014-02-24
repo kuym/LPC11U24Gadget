@@ -18,7 +18,7 @@ void		memset_volatile(void volatile* dest, unsigned int value, unsigned int leng
 {
 	volatile unsigned char* p = (volatile unsigned char*)dest;
 	for(unsigned int i = 0; i < length; i++)
-		*p++ = 0;
+		*p++ = value;
 }
 
 ////////////////////////////////////////////////////////////////
@@ -26,6 +26,8 @@ void		memset_volatile(void volatile* dest, unsigned int value, unsigned int leng
 
 int		NumberFormatter::format(char* output, unsigned int number, int fractionBits, Base base)
 {
+	(void)fractionBits;	// not currently supported
+
 	static char const charTable[] = "0123456789ABCDEF";
 	char buf[11];
 	int len = 0;
@@ -66,18 +68,9 @@ int		NumberFormatter::format(char* output, unsigned int number, int fractionBits
 ////////////////////////////////////////////////////////////////
 // CircularBuffer
 
-			CircularBuffer::CircularBuffer(int bufferSize)
-{
-	bufferSize = (unsigned short)bufferSize;
-	buffer = new unsigned char[bufferSize];
-	
-	((unsigned short*)buffer)[1] = bufferSize;
-	((unsigned short*)buffer)[1] = 0;
-	((unsigned short*)buffer)[2] = 0;
-}
 
 //  returns the number of bytes occupied (available for reading) in this buffer
-int			CircularBuffer::used(void) const
+int			CircularBuffer::used() const
 {
 	unsigned short	bufferSize = bsize(),
 					h = head(),
@@ -87,7 +80,7 @@ int			CircularBuffer::used(void) const
 }
 
 //  returns the number of bytes available for writing in this buffer
-int			CircularBuffer::free(void) const
+int			CircularBuffer::free() const
 {
 	unsigned short	bufferSize = bsize(),
 					h = head(),
@@ -96,6 +89,59 @@ int			CircularBuffer::free(void) const
 	return((h >= t)? (bufferSize - (h - t) - 1) : (t - h - 1));
 }
 
+unsigned char	CircularBuffer::operator [](int offset) const
+{
+	unsigned short	bufferSize = bsize();
+
+	offset += tail();
+	if(offset > bufferSize)
+		offset -= bufferSize;
+
+	return(bp()[offset]);
+}
+
+			CircularBuffer::CircularBuffer(void):
+				buffer(0)
+{
+}
+
+			CircularBuffer::~CircularBuffer(void)
+{
+	dealloc();
+}
+
+bool		CircularBuffer::alloc(int bufferSize)
+{
+	dealloc();
+
+	// crop to 16-bit for this implementation
+	bufferSize = (unsigned short)bufferSize;
+	
+	// operator new may return 0 in this ABI
+	buffer = new unsigned char[(3 * sizeof(unsigned short)) + bufferSize];
+	if(buffer == 0)
+		return(false);
+	
+	((unsigned short*)buffer)[0] = bufferSize;
+	head() = 0;
+	tail() = 0;
+
+	return(true);
+}
+
+void		CircularBuffer::dealloc(void)
+{
+	if(buffer != 0)
+	{
+		delete[] buffer;
+		buffer = 0;
+	}
+}
+
+void		CircularBuffer::reset(void)
+{
+	head() = tail();
+}
 
 //  writes 'length' bytes from an input array ('in') into a circular buffer.  Returns
 //    the number of bytes written.
@@ -124,7 +170,7 @@ int			CircularBuffer::write(unsigned char const* in, int length)
 	}
 	if(length > 0)
 	{
-		b = buffer + h + 2;
+		b = bp() + h;
 		
 		while(length-- && (h < (t - 1)))
 		{
@@ -222,7 +268,7 @@ int			CircularBuffer::readByte(unsigned char* b)
 
 #define HARDWARE_EXTERNAL_CRYSTAL_FREQUENCY	(12000000UL)	//a property of the board
 
-void			System_strobeClockUpdateEnable(REGISTER updateEnable)
+void			System_strobeClockUpdateEnable(REGISTER_REF updateEnable)
 {
 	*updateEnable = 1;
 	*updateEnable = 0;
@@ -432,6 +478,8 @@ void				UART::flush(void)
 
 void			SPI::start(int bitRate, Mode mode, Role role)
 {
+	(void)role;	// not currently supported
+	
 	//assert reset
 	if(deviceNum == 0)
 		*PeripheralnReset &= ~PeripheralnReset_SPI0;

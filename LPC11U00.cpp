@@ -278,7 +278,13 @@ void* __dso_handle_nostdlib = 0;
 
 extern "C" int __aeabi_atexit(void* object, void (*destroyer)(void*), void* dso_handle)
 {
-	return(0);	//firmware never exits
+	(void)object;
+	(void)destroyer;
+	(void)dso_handle;
+
+	//destroyer(object);	// ?
+
+	return(0);	// firmware never exits
 }
 
 extern "C" int __aeabi_sidiv(int numerator, int denominator)

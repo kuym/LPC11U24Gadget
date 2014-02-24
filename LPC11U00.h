@@ -23,8 +23,9 @@ namespace LPC11U00
 
 	#define							_BIT(n)		(1 << (n))
 	
-	#define REGISTER				u32 volatile* const
-	#define REGISTER_ADDRESS(x)		((u32 volatile*)(x))
+	#define REGISTER				static u32 volatile* const
+	#define REGISTER_REF			u32 volatile* const
+	#define REGISTER_ADDRESS(x)		((u32 volatile* const)(x))
 
 	#define INTERRUPT				__attribute__ ((interrupt ("IRQ")))
 

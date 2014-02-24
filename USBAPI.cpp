@@ -124,6 +124,8 @@ static ErrorCode	packetHandler(		USBHandle usb,
 										USBEvent endpointEvent
 									)
 {
+	(void)usb;
+
 	USBDescriptorConfigurationHeader* descriptor = 0;
 	if(((USBDescriptorHeader const*)closure)->type == DescriptorType_Configuration)
 		descriptor = (USBDescriptorConfigurationHeader*)closure;
@@ -211,8 +213,14 @@ static ErrorCode	packetHandler(		USBHandle usb,
 	return(ErrorCode_Unhandled);
 }
 
-static ErrorCode	standardSetupHandler(void* context, USBDescriptorHeader const* endpoint, USBSetup const* setupPacket)
+static ErrorCode	standardSetupHandler(	void* context,
+											USBDescriptorHeader const* endpoint,
+											USBSetup const* setupPacket
+										)
 {
+	(void)context;
+	(void)endpoint;
+
 	if(setupPacket == 0)	// is an OUT packet
 	{
 		// OUT packets to EP0 seem to be completely empty, perhaps a ROM API anomaly?
@@ -384,11 +392,27 @@ ErrorCode		USB::SetDescriptor(		void const* descriptor,
 ErrorCode		USB::Start(void)
 {
 	//USB setup
-	HardwareInit hardwareInit = {0};
-	hardwareInit.usbRegisterBase = 0x40080000;
-	hardwareInit.memBase = 0x20004800;	//should be 0x20004000 according to the datasheet
-	hardwareInit.memSize = 0x2000;
-	hardwareInit.maxNumEndpoints = 7;	//@@make parametric
+	HardwareInit hardwareInit =
+	{
+		.usbRegisterBase =		0x40080000,
+		.memBase =				0x20004800,	// should be 0x20004000 according to the datasheet
+		.memSize =				0x2000,
+		.maxNumEndpoints =		7,			// @@make parametric
+		.__reserved0 =			{0},
+		.ResetHandler =			0,
+		.SuspendHandler =		0,
+		.ResumeHandler =		0,
+		.__reserved1 =			0,
+		.SOFEventHandler =		0,
+		.WakeUpEventHandler =	0,
+		.__reserved2 =			0,
+		.ErrorHandler =			0,
+		.ConfigureHandler =		0,
+		.InterfaceHandler =		0,
+		.FeatureHandler =		0,
+		.__reserved3 =			0,
+		.__reserved4 =			0,
+	};
 
 	gUSBAPIHandle = 0;
 	ErrorCode usbError = (*API)->usb->hardware->Init(&gUSBAPIHandle, &gUSBState.descriptors, &hardwareInit);

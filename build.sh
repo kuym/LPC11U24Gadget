@@ -42,7 +42,7 @@ for s in $sources; do
 	count=$(($count + 1))
 
 	echo "Building $s"
-	arm-none-eabi-gcc -Wall -Wno-switch -nostdlib -nodefaultlibs -fno-exceptions \
+	arm-none-eabi-gcc -Wall -Wextra -Wno-switch -nostdlib -nodefaultlibs -fno-exceptions \
 		-g -Os -mthumb -march=armv6-m -mcpu=cortex-m0 -Wno-attributes \
 		-I . \
 		-o $o -x $lang -c $s
@@ -54,7 +54,7 @@ for s in $sources; do
 done
 
 echo Linking...
-arm-none-eabi-gcc -Wall -nostdlib -nodefaultlibs -fno-exceptions \
+arm-none-eabi-gcc -Wall -Wextra -nostdlib -nodefaultlibs -fno-exceptions \
 		-g -Os -mthumb -march=armv6-m -mcpu=cortex-m0 \
 		-T $linkerFile -o obj/test.elf $objs
 

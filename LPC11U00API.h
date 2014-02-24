@@ -32,23 +32,32 @@ public:
 class CircularBuffer
 {
 public:
-			CircularBuffer(int bufferSize);
-	int		used(void) const;
-	int		free(void) const;
-	int		write(unsigned char const* in, int length);
-	int		writeByte(unsigned char b);
-	int		read(unsigned char* out, int length);
-	int		readByte(unsigned char* b);
+	int				used() const;
+	int				free() const;
+
+					CircularBuffer(void);
+					~CircularBuffer(void);
+
+	bool			alloc(int bufferSize);
+	void			dealloc(void);
+	void			reset(void);
+
+	unsigned char	operator [](int offset) const;
+
+	int				write(unsigned char const* in, int length);
+	int				writeByte(unsigned char b);
+	int				read(unsigned char* out, int length);
+	int				readByte(unsigned char* b);
 
 private:
-	inline unsigned short bsize(void) const		{return(((unsigned short*)buffer)[0]);}
-	inline unsigned short head(void) const		{return(((unsigned short*)buffer)[1]);}
-	inline unsigned short& head(void)			{return(((unsigned short*)buffer)[1]);}
-	inline unsigned short tail(void) const		{return(((unsigned short*)buffer)[2]);}
-	inline unsigned short& tail(void)			{return(((unsigned short*)buffer)[2]);}
+	inline unsigned short	bsize(void) const	{return(((unsigned short*)buffer)[0]);}
+	inline unsigned short	head(void) const	{return(((unsigned short*)buffer)[1]);}
+	inline unsigned short&	head(void)			{return(((unsigned short*)buffer)[1]);}
+	inline unsigned short	tail(void) const	{return(((unsigned short*)buffer)[2]);}
+	inline unsigned short&	tail(void)			{return(((unsigned short*)buffer)[2]);}
 	
-	inline unsigned char volatile const* bp(void) const	{return(buffer + (3 * sizeof(unsigned short)));}
-	inline unsigned char volatile * bp(void)			{return(buffer + (3 * sizeof(unsigned short)));}
+	inline unsigned char volatile const*	bp(void) const	{return(buffer + (3 * sizeof(unsigned short)));}
+	inline unsigned char volatile*			bp(void)		{return(buffer + (3 * sizeof(unsigned short)));}
 	
 	unsigned char volatile*	buffer;
 };
@@ -56,7 +65,7 @@ private:
 ////////////////////////////////////////////////////////////////
 // System
 
-void	System_strobeClockUpdateEnable(REGISTER updateEnable);
+void	System_strobeClockUpdateEnable(REGISTER_REF updateEnable);
 
 class System
 {
