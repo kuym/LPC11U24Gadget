@@ -11,6 +11,7 @@ libc.cpp \
 LPC11U00.cpp \
 LPC11U00API.cpp \
 USBAPI.cpp \
+USBCDC.cpp \
 main.cpp \
 "
 

@@ -142,7 +142,33 @@ struct LPCROMAPI
 LPCROMAPI** const ROMAPI = (LPCROMAPI**)0x1FFF1FF8;
 
 ////////////////////////////////////////////////////////////////
+//
+// low-level assert functions provided for hard-fault handling and so on
 
+void			writeSync(char const* msg, int length = -1)
+{
+	while(((length == -1) && *msg) || (length-- > 0))
+	{
+		while(!(*LPC11U00::UARTLineStatus & LPC11U00::UARTLineStatus_TxHoldingRegisterEmpty));
+		*LPC11U00::UARTData = *msg++;
+	}
+}
+void			writeSync(unsigned int v)
+{
+	static char const* hex = "0123456789ABCDEF";
+
+	for(int i = 0; i < 8; i++)
+	{
+		while(!(*LPC11U00::UARTLineStatus & LPC11U00::UARTLineStatus_TxHoldingRegisterEmpty));
+		*LPC11U00::UARTData = hex[v >> 28];
+		v <<= 4;
+	}
+}
+
+////////////////////////////////////////////////////////////////
+
+
+static signed int volatile gInterruptCount;	// interrupts initially disabled at boot
 
 extern "C" void STARTUP __attribute__((naked)) _gaunt_start(void)
 {
@@ -175,28 +201,28 @@ extern "C" void STARTUP __attribute__((naked)) _gaunt_start(void)
 	"._start_ctors_done:				\n"
 	::: "r0", "r1", "r2", "r4", "r5");
 	
+	gInterruptCount = 1;
 	main();
 	HardFault_Handler();
 }
 
-void	writeSync(char const* msg, int length = -1)
+void			interruptsEnabled(void)
 {
-	while(((length == -1) && *msg) || (length-- > 0))
+	signed int count = --gInterruptCount;
+	if(count < 0)
 	{
-		while(!(*LPC11U00::UARTLineStatus & LPC11U00::UARTLineStatus_TxHoldingRegisterEmpty));
-		*LPC11U00::UARTData = *msg++;
+		writeSync("\nfault! intCnt=");
+		writeSync(count);
+		__asm__ volatile ("bkpt 0x06"::);	// invalid interrupt-free refcount
 	}
+	else if (count == 0)
+		__asm__ volatile ("cpsie i"::);
 }
-void	writeSync(unsigned int v)
-{
-	static char const* hex = "0123456789ABCDEF";
 
-	for(int i = 0; i < 8; i++)
-	{
-		while(!(*LPC11U00::UARTLineStatus & LPC11U00::UARTLineStatus_TxHoldingRegisterEmpty));
-		*LPC11U00::UARTData = hex[v >> 28];
-		v <<= 4;
-	}
+void			interruptsDisabled(void)
+{
+	__asm__ volatile ("cpsid i"::);
+	gInterruptCount++;
 }
 
 extern "C" void STARTUP INTERRUPT __attribute__((naked)) HardFault_Handler(void)

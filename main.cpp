@@ -142,130 +142,6 @@ static unsigned char const __attribute__((aligned(4))) kUSBStrings[] =
 	;
 
 
-struct __attribute__((aligned(4))) USBCDCDevice
-{
-	USBCDCLineCoding	lineCoding;
-	unsigned int		expecting;
-	unsigned int		connected;
-	CircularBuffer		buffer;
-};
-
-
-ErrorCode	USBCDCACMHandler(void* context, USBDescriptorHeader const* endpoint, USBSetup const* setupPacket)
-{
-	unsigned int endpointAddress = (endpoint->type == DescriptorType_Endpoint)?
-										((USBDescriptorEndpoint*)endpoint)->endpointAddress
-										: 0;
-	
-	// debug
-	/*
-	if(endpointAddress == 0)
-	{
-		UART::writeSync("\ncls:");
-		UART::writeHexDumpSync((unsigned char*)setupPacket, sizeof(USBSetup));
-	}
-	else
-	{
-		UART::writeSync("\nep");
-		UART::writeSync(endpointAddress, NumberFormatter::Hexadecimal);
-		UART::writeSync(":");
-	}
-	*/
-	// end debug
-
-	USBCDCDevice* state = (USBCDCDevice*)context;
-
-	if(setupPacket != 0)
-	{
-		switch(setupPacket->bRequest)
-		{
-		case USBCDC_Request_SetLineCoding:
-			state->expecting = USBCDC_Request_SetLineCoding;
-			return(ErrorCode_SendZeroLengthPacket);
-
-		case USBCDC_Request_GetLineCoding:
-			USB::Write(		0x80,
-							(unsigned char*)&state->lineCoding,
-							sizeof(USBCDCLineCoding)
-						);
-			return(ErrorCode_OK);
-
-		case USBCDC_Request_SetControlLineState:
-			if(setupPacket->wValue & USBCDC_ControlLine_DTEPresent)
-			{
-			}
-			if(setupPacket->wValue & USBCDC_ControlLine_ActivateCarrier)
-			{
-				if(!state->connected)
-					UART::writeSync("\nonline");
-				state->connected = 1;
-			}
-			else
-			{
-				if(state->connected)
-					UART::writeSync("\noffline");
-				state->connected = 0;
-			}
-
-			return(ErrorCode_SendZeroLengthPacket);
-		}
-	}
-	else if(endpointAddress == 0x00)
-	{
-		unsigned char buffer[64];
-		unsigned int bytesRead = USB::Read(endpointAddress, buffer);
-		
-		switch(state->expecting)
-		{
-		case USBCDC_Request_SetLineCoding:
-			if(bytesRead != sizeof(USBCDCLineCoding))
-			{
-				UART::writeSync(" size mismatch!");
-				break;
-			}
-			memcpy(&state->lineCoding, buffer, sizeof(USBCDCLineCoding));
-			UART::writeSync("\nformat: ");
-			UART::writeSync(state->lineCoding.dwDTERate, NumberFormatter::DecimalUnsigned);
-			UART::writeSync(",");
-			UART::writeSync(state->lineCoding.bDataBits, NumberFormatter::DecimalUnsigned);
-			UART::writeSync(state->lineCoding.bParityType? "p" : "n");
-			UART::writeSync(state->lineCoding.bCharFormat + 1, NumberFormatter::DecimalUnsigned);
-			state->expecting = 0;
-			break;
-
-		default:
-			UART::writeSync("\nunhandled class ep0 rd:");
-			UART::writeSync(bytesRead, NumberFormatter::DecimalUnsigned);
-			UART::writeSync(">");
-			UART::writeHexDumpSync(buffer, bytesRead);
-
-			break;
-		}
-	}
-	else if(endpointAddress == 0x03)	// endpoint 0x02 OUT
-	{
-		unsigned char buffer[64];
-		unsigned int bytesRead = USB::Read(endpointAddress, buffer);
-		
-		UART::writeSync("\nep2 rd:");
-		UART::writeSync(bytesRead, NumberFormatter::DecimalUnsigned);
-		UART::writeSync(">");
-		UART::writeHexDumpSync(buffer, bytesRead);
-
-		state->buffer.write(buffer, bytesRead);
-
-		// if we couldn't accept another [endpoint size] bytes, stall the pipe
-		if(state->buffer.free() < 64)
-			USB::SetStall(0x03, true);
-	}
-	else if(endpointAddress == 0x83)	// endpoint 0x82 IN
-	{
-		// anything additional to send in to the host?
-	}
-
-	return(ErrorCode_OK);
-}
-
 extern "C" void		USB_IRQHandler(void)
 {
 	USB::Interrupt();
@@ -298,13 +174,11 @@ int main(void)
 	USB::SetDescriptor((unsigned char const*)&kCDCACMConfigurationDescriptor, sizeof(kCDCACMConfigurationDescriptor));
 	USB::SetDescriptor((unsigned char const*)&kUSBStrings, sizeof(kUSBStrings));
 
-	USBCDCDevice cdcDeviceState;
-	memset_volatile(&cdcDeviceState, 0, sizeof(cdcDeviceState));
-	cdcDeviceState.buffer.alloc(32);
+	USBCDCDevice cdcDevice(256, 256);
 
-	USB::RegisterHandler((unsigned char const*)&kCDCACMConfigurationDescriptor, &USBCDCACMHandler, &cdcDeviceState);
-	USB::RegisterHandler((unsigned char const*)&kCDCACMConfigurationDescriptor.endpoint1_0, &USBCDCACMHandler, &cdcDeviceState);
-	USB::RegisterHandler((unsigned char const*)&kCDCACMConfigurationDescriptor.endpoint1_1, &USBCDCACMHandler, &cdcDeviceState);
+	USB::RegisterHandler((unsigned char const*)&kCDCACMConfigurationDescriptor, &USBCDCDevice::USBCDCACMHandler, &cdcDevice);
+	USB::RegisterHandler((unsigned char const*)&kCDCACMConfigurationDescriptor.endpoint1_0, &USBCDCDevice::USBCDCACMHandler, &cdcDevice);
+	USB::RegisterHandler((unsigned char const*)&kCDCACMConfigurationDescriptor.endpoint1_1, &USBCDCDevice::USBCDCACMHandler, &cdcDevice);
 
 	ErrorCode error = USB::Start();
 	if(error != ErrorCode_OK)
@@ -313,7 +187,7 @@ int main(void)
 		UART::writeSync(error, NumberFormatter::Hexadecimal);
 	}
 
-	__asm__ volatile ("cpsie i"::);
+	interruptsEnabled();
 	
 	USB::Connect();
 	UART::writeSync("\nConnected");
@@ -321,12 +195,12 @@ int main(void)
 	while(true)
 	{
 		//__asm__ volatile ("wfi"::);
-		UART::writeSync("\nalive.");
-		delay(1000);
+		//UART::writeSync("\nalive.");
+		//delay(1000);
 		
 		//USB::Write(0x83, (unsigned char*)"hello :-)\n", 10);
 
-		int length = cdcDeviceState.buffer.used();
+		/*int length = cdcDeviceState.buffer.used();
 		if(cdcDeviceState.connected && (length > 0))
 		{
 			length = (length > 10)? 10 : length;
@@ -340,5 +214,27 @@ int main(void)
 
 			USB::Write(0x83, miniBuffer, length);
 		}
+		*/
+
+		
+		if(cdcDevice.connected())
+		{
+			UART::writeSync("\nconn");
+
+			int length;
+			while((length = cdcDevice.bytesAvailable()) > 0)
+			{
+				UART::writeSync("\necho:0x");
+				UART::writeSync(length, NumberFormatter::Hexadecimal);
+
+				unsigned char buffer[11];
+				unsigned int bytesRead = cdcDevice.Read(buffer, 10);
+
+				buffer[bytesRead] = '|';
+
+				cdcDevice.Write(buffer, bytesRead + 1);
+			}
+		}
+		__asm__ volatile ("wfi"::);
 	}
 }

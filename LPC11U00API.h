@@ -5,8 +5,9 @@
 using namespace LPC11U00;
 
 void delay(unsigned int ms);
+void delayMicro(unsigned int us);
 
-extern "C" void memset_volatile(void volatile* dest, unsigned int value, unsigned int length);
+extern "C" void vmemset(void volatile* dest, unsigned int value, unsigned int length);
 
 
 ////////////////////////////////////////////////////////////////
@@ -32,9 +33,9 @@ public:
 class CircularBuffer
 {
 public:
-	inline int	size() const	{return(_p[0]);}
-	inline int	used() const	{return(_p[2]);}
-	inline int	free() const	{return(_p[0] - _p[2]);}
+	inline int	size() volatile const	{return(_p[0]);}
+	inline int	used() volatile const	{return(_p[2]);}
+	inline int	free() volatile const	{return(_p[0] - _p[2]);}
 	
 				CircularBuffer(void);
 				~CircularBuffer(void);
@@ -90,7 +91,7 @@ private:
 		_p[2] += increment;
 	}
 	
-	unsigned short*	_p;
+	unsigned short volatile*	_p;
 };
 
 ////////////////////////////////////////////////////////////////

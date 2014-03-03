@@ -1,6 +1,12 @@
 #ifndef __USBCDC_H__
 #define __USBCDC_H__
 
+#include <LPC11U00.h>
+#include <LPC11U00API.h>
+
+using namespace LPC11U00;
+using namespace LPC11U00::ROMUSB;
+
 struct __attribute__((packed)) USBCDCLineCoding
 {
 	unsigned int	dwDTERate;		//Data terminal rate in bits per second
@@ -8,8 +14,6 @@ struct __attribute__((packed)) USBCDCLineCoding
 	unsigned char	bParityType;	//Parity bit type
 	unsigned char	bDataBits;		//Number of data bits
 };
-
-
 
 //Communication interface class code, section 4.2, Table 15)
 enum USBCDC_Class
@@ -185,6 +189,30 @@ enum USBCDC_State
 	USBCDC_State_SerialStateBreak				= (1 << 2),		// state of break detection
 	USBCDC_State_SerialStateTxCarrier			= (1 << 1),		// state of transmission carrier
 	USBCDC_State_SerialStateRxCarrier			= (1 << 0),		// state of receiver carrier
+};
+
+////////////////////////////////////////////////////////////////
+
+struct __attribute__((aligned(4))) USBCDCDevice
+{
+public:
+	inline bool			connected() volatile const		{return(((USBCDCDevice volatile*)this)->isConnected);}
+	inline unsigned int	bytesAvailable() volatile const	{return(readBuffer.used());}	// ...to read
+	inline unsigned int	bytesFree() volatile const		{return(writeBuffer.free());}	// ...in which to write
+
+						USBCDCDevice(unsigned int readBufferSize, unsigned int writeBufferSize);
+
+	unsigned int		Read(unsigned char* outData, unsigned int length);
+	unsigned int		Write(unsigned char const* data, unsigned int length);
+	
+	static ErrorCode	USBCDCACMHandler(void* context, USBDescriptorHeader const* endpoint, USBSetup const* setupPacket);
+
+private:
+	USBCDCLineCoding	lineCoding;
+	unsigned int		expecting;
+	unsigned int		isConnected;
+	CircularBuffer		readBuffer;
+	CircularBuffer		writeBuffer;
 };
 
 #endif //!defined __USBCDC_H__

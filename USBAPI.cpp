@@ -358,7 +358,7 @@ ErrorCode		USB::Interrupt(void)
 
 void			USB::Init(void)
 {
-	memset_volatile(&gUSBState, 0, sizeof(gUSBState));
+	vmemset(&gUSBState, 0, sizeof(gUSBState));
 	
 	gUSBAPIHandle = 0;
 }

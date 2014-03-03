@@ -694,9 +694,9 @@ namespace LPC11U00
 	
 	////////////////////////////////////////////////////////////////
 	
-	REGISTER GPIO0 = REGISTER_ADDRESS(0x50001000UL);
-	REGISTER GPIO0DIR = REGISTER_ADDRESS(0x50002000UL);
-	REGISTER GPIO0RAW = REGISTER_ADDRESS(0x50002100UL);
+	REGISTER GPIO0 =	REGISTER_ADDRESS(0x50001000UL);
+	REGISTER GPIO0Dir =	REGISTER_ADDRESS(0x50002000UL);
+	REGISTER GPIO0Raw =	REGISTER_ADDRESS(0x50002100UL);
 
 	////////////////////////////////////////////////////////////////
 
@@ -1399,8 +1399,19 @@ namespace LPC11U00
 
 }	// c++ LPC11U00 namespace
 
+extern "C"
+{
+
 #endif //__cplusplus
 
+	void			interruptsEnabled(void);
+	void			interruptsDisabled(void);
+
+#ifdef __cplusplus
+
+}	// c++ extern "C"
+
+#endif //__cplusplus
 
 #endif	//!assembler
 

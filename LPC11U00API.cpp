@@ -6,7 +6,8 @@ using namespace LPC11U00;
 using namespace LPC11U00::ROMDivider;
 using namespace LPC11U00::ROMAPI;
 
-static unsigned int g1Millisecond = (12e6 / 1000 / 18);
+static unsigned int g1Millisecond = (12e6 / 1000 / 18);		// number of spinloop cycles in 1ms
+static unsigned int g8Microseconds = (12e6 / 1000000 / 6);	// number of spinloop cycles in 8us
 
 void delay(unsigned int ms)
 {
@@ -15,7 +16,15 @@ void delay(unsigned int ms)
 			__asm__ volatile ("nop \n nop \n nop \n nop \n" ::);
 }
 
-void		memset_volatile(void volatile* dest, unsigned int value, unsigned int length)
+void delayMicro(unsigned int us)
+{
+	us = (us + 7) >> 3;
+	while(us--)
+		for(unsigned int i = g8Microseconds; i; i--)
+			__asm__ volatile ("nop \n nop \n nop \n nop \n" ::);
+}
+
+void		vmemset(void volatile* dest, unsigned int value, unsigned int length)
 {
 	volatile unsigned char* p = (volatile unsigned char*)dest;
 	for(unsigned int i = 0; i < length; i++)
@@ -113,6 +122,7 @@ bool	CircularBuffer::alloc(int bufferSize)
 	bufferSize = (unsigned short)bufferSize;
 	
 	// operator new may return 0 in this ABI
+	interruptsDisabled();
 	_p = (unsigned short*)new unsigned char[(3 * sizeof(unsigned short)) + bufferSize];
 	if(_p == 0)
 		return(false);
@@ -121,25 +131,32 @@ bool	CircularBuffer::alloc(int bufferSize)
 	((unsigned short*)_p)[1] = 0;
 	((unsigned short*)_p)[2] = 0;
 	
+	interruptsEnabled();
 	return(true);
 }
 
 void	CircularBuffer::dealloc(void)
 {
+	interruptsDisabled();
 	if(_p != 0)
 	{
 		delete[] _p;
 		_p = 0;
 	}
+	interruptsEnabled();
 }
 
 void	CircularBuffer::reset(void)
 {
+	interruptsDisabled();
 	_p[2] = 0;
+	interruptsEnabled();
 }
 
 int		CircularBuffer::read(unsigned char* out, int length)
 {
+	interruptsDisabled();
+	
 	if(length < 0)	length = 0;
 	int count = 0, b2, b1 = tb();
 	if(length < b1)	b1 = length;
@@ -156,11 +173,15 @@ int		CircularBuffer::read(unsigned char* out, int length)
 		count += b2;
 		T(b2);
 	}
+	
+	interruptsEnabled();
 	return(count);
 }
 
 int		CircularBuffer::write(unsigned char const* in, int length)
 {
+	interruptsDisabled();
+	
 	if(length < 0)	length = 0;
 	int count = 0, b2, b1 = hb();
 	if(length < b1)	b1 = length;
@@ -177,6 +198,8 @@ int		CircularBuffer::write(unsigned char const* in, int length)
 		count += b2;
 		h(b2);
 	}
+	
+	interruptsEnabled();
 	return(count);
 }
 
@@ -255,7 +278,9 @@ void			System::setupSystemPLL(void)
 	*MainClockSource = MainClockSource_PLLOutput;
 	System_strobeClockUpdateEnable(MainClockSourceUpdate);
 	
-	g1Millisecond = getCoreFrequency() / 18000UL;	//the number of spinloop iterations per millisecond
+	// update the time constants for the new clock frequency
+	g1Millisecond = getCoreFrequency() / 18000UL;
+	g8Microseconds = getCoreFrequency() / 6000000UL;	// @@needs adjustment
 }
 
 
