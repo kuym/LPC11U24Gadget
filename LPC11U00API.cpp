@@ -178,6 +178,20 @@ int		CircularBuffer::read(unsigned char* out, int length)
 	return(count);
 }
 
+unsigned char	CircularBuffer::readByte(void)
+{
+	interruptsDisabled();
+	unsigned char b = 0;
+	if(tb() > 0)
+	{
+		b = *T();
+		T(1);
+	}
+	interruptsEnabled();
+	return(b);
+}
+
+
 int		CircularBuffer::write(unsigned char const* in, int length)
 {
 	interruptsDisabled();
@@ -203,6 +217,16 @@ int		CircularBuffer::write(unsigned char const* in, int length)
 	return(count);
 }
 
+void	CircularBuffer::writeByte(unsigned char b)
+{
+	interruptsDisabled();
+	if(hb() > 0)
+	{
+		*h() = b;
+		h(1);
+	}
+	interruptsEnabled();
+}
 
 
 ////////////////////////////////////////////////////////////////

@@ -36,22 +36,22 @@ namespace LPC11U00
 	{
 		IOConfigPIO_FunctionMask			=	(0x03),
 
-			IOConfigPIO_PullDown				=	(0x01 << 3),
-			IOConfigPIO_PullUp					=	(0x02 << 3),
-			IOConfigPIO_Repeat					=	(0x03 << 3),
-			
-			IOConfigPIO_Hysteresis				=	(0x01 << 5),
-			
-			IOConfigPIO_InvertInput				=	(0x01 << 6),
-			
-			IOConfigPIO_AnalogMask				=	(0x03 << 7),
+		IOConfigPIO_PullDown				=	(0x01 << 3),
+		IOConfigPIO_PullUp					=	(0x02 << 3),
+		IOConfigPIO_Repeat					=	(0x03 << 3),
+		
+		IOConfigPIO_Hysteresis				=	(0x01 << 5),
+		
+		IOConfigPIO_InvertInput				=	(0x01 << 6),
+		
+		IOConfigPIO_AnalogMask				=	(0x03 << 7),
 
-			IOConfigPIO_DigitalMode				=	(0x01 << 7),
-			
-			IOConfigPIO_GlitchFilter			=	(0x01 << 8),
+		IOConfigPIO_DigitalMode				=	(0x01 << 7),
+		
+		IOConfigPIO_GlitchFilter			=	(0x01 << 8),
 
-			IOConfigPIO_OpenDrain				=	(0x01 << 10),
-		};
+		IOConfigPIO_OpenDrain				=	(0x01 << 10),
+	};
 
 	REGISTER IOConfigPIO0_0		= REGISTER_ADDRESS(0x40044000);
 		enum IOConfigPIO0_0
@@ -153,6 +153,50 @@ namespace LPC11U00
 			IOConfigPIO0_9_Function_IOH_7		=	(0x03 << 0),
 
 			IOConfigPIO0_9_Supported			=	(0x7F | IOConfigPIO_OpenDrain)
+		};
+
+	REGISTER IOConfigPIO0_11	= REGISTER_ADDRESS(0x4004402C);
+		enum IOConfigPIO0_11
+		{
+			IOConfigPIO0_11_Function_JTAGTDI	=	(0x00 << 0),
+			IOConfigPIO0_11_Function_PIO		=	(0x01 << 0),
+			IOConfigPIO0_11_Function_AD0		=	(0x02 << 0),
+			IOConfigPIO0_11_Function_T2_M3		=	(0x03 << 0),
+
+			IOConfigPIO0_11_Supported			=	(0x7F | IOConfigPIO_AnalogMask | IOConfigPIO_GlitchFilter | IOConfigPIO_OpenDrain)
+		};
+
+	REGISTER IOConfigPIO0_12	= REGISTER_ADDRESS(0x40044030);
+		enum IOConfigPIO0_12
+		{
+			IOConfigPIO0_12_Function_JTAGTMS	=	(0x00 << 0),
+			IOConfigPIO0_12_Function_PIO		=	(0x01 << 0),
+			IOConfigPIO0_12_Function_AD1		=	(0x02 << 0),
+			IOConfigPIO0_12_Function_T3_C0		=	(0x03 << 0),
+
+			IOConfigPIO0_12_Supported			=	(0x7F | IOConfigPIO_AnalogMask | IOConfigPIO_GlitchFilter | IOConfigPIO_OpenDrain)
+		};
+
+	REGISTER IOConfigPIO0_13	= REGISTER_ADDRESS(0x40044034);
+		enum IOConfigPIO0_13
+		{
+			IOConfigPIO0_13_Function_JTAGTDO	=	(0x00 << 0),
+			IOConfigPIO0_13_Function_PIO		=	(0x01 << 0),
+			IOConfigPIO0_13_Function_AD2		=	(0x02 << 0),
+			IOConfigPIO0_13_Function_T3_M0		=	(0x03 << 0),
+
+			IOConfigPIO0_13_Supported			=	(0x7F | IOConfigPIO_AnalogMask | IOConfigPIO_GlitchFilter | IOConfigPIO_OpenDrain)
+		};
+
+	REGISTER IOConfigPIO0_14	= REGISTER_ADDRESS(0x40044038);
+		enum IOConfigPIO0_14
+		{
+			IOConfigPIO0_14_Function_JTAGTRST	=	(0x00 << 0),
+			IOConfigPIO0_14_Function_PIO		=	(0x01 << 0),
+			IOConfigPIO0_14_Function_AD3		=	(0x02 << 0),
+			IOConfigPIO0_14_Function_T3_M1		=	(0x03 << 0),
+
+			IOConfigPIO0_14_Supported			=	(0x7F | IOConfigPIO_AnalogMask | IOConfigPIO_GlitchFilter | IOConfigPIO_OpenDrain)
 		};
 
 	REGISTER IOConfigPIO0_18	= REGISTER_ADDRESS(0x40044048);
@@ -694,9 +738,13 @@ namespace LPC11U00
 	
 	////////////////////////////////////////////////////////////////
 	
-	REGISTER GPIO0 =	REGISTER_ADDRESS(0x50001000UL);
+	REGISTER GPIO0 =	REGISTER_ADDRESS(0x50001000UL);	// access with GPIO0[pinNum]
 	REGISTER GPIO0Dir =	REGISTER_ADDRESS(0x50002000UL);
 	REGISTER GPIO0Raw =	REGISTER_ADDRESS(0x50002100UL);
+	
+	REGISTER GPIO1 =	REGISTER_ADDRESS(0x50001080UL);	// access with GPIO1[pinNum]
+	REGISTER GPIO1Dir =	REGISTER_ADDRESS(0x50002004UL);
+	REGISTER GPIO1Raw =	REGISTER_ADDRESS(0x50002104UL);
 
 	////////////////////////////////////////////////////////////////
 
@@ -737,20 +785,22 @@ namespace LPC11U00
 	REGISTER	InterruptClearPending0 =	REGISTER_ADDRESS(0xE000E280);
 	REGISTER	InterruptActive0 =			REGISTER_ADDRESS(0xE000E300);
 
-	REGISTER	InterruptControlAndState =	REGISTER_ADDRESS(0xE000ED04);
-		enum InterruptControlAndState
+	REGISTER	InterruptControl =			REGISTER_ADDRESS(0xE000ED04);
+		enum InterruptControl
 		{
-			NMIPendingSet =				(1 << 31),	// set NMI interrupt pending flag
-			PendSVSet =					(1 << 28),	// set PendSV interrupt pending flag
-			PendSVClear =				(1 << 27),	// clear PendSV interrupt pending flag
-			PendSystickSet =			(1 << 26),	// set SysTick interrupt pending flag
-			PendSystickClear =			(1 << 25),	// clear SysTick interrupt pending flag
-			ISRPending =				(1 << 22),	// read-only; is an ISR pending?
+			InterruptControl_NMIPendingSet =		(1 << 31),	// set NMI interrupt pending flag
+			InterruptControl_PendSVSet =			(1 << 28),	// set PendSV interrupt pending flag
+			InterruptControl_PendSVClear =			(1 << 27),	// clear PendSV interrupt pending flag
+			InterruptControl_PendSystickSet =		(1 << 26),	// set SysTick interrupt pending flag
+			InterruptControl_PendSystickClear =		(1 << 25),	// clear SysTick interrupt pending flag
+			InterruptControl_ISRPending =			(1 << 22),	// read-only; is an ISR pending?
 
 			//for these two, 0 means normal mode; subtract 16 to get the IRQ number (ala InterruptEnableSet0)
-			PendingVector__Mask =		(0x3F << 12),	//the vector number of the next pending interrupt
-			ActiveVector__Mask =		(0x3F),			//the vector number of the current state of execution
+			InterruptControl_PendingVector__Mask =	(0x3F << 12),	//the vector number of the next pending interrupt
+			InterruptControl_ActiveVector__Mask =	(0x3F),			//the vector number of the current state of execution
 		};
+
+	////////////////////////////////////////////////////////////////
 
 	#ifdef __cplusplus
 	

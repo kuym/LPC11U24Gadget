@@ -202,6 +202,12 @@ extern "C" void STARTUP __attribute__((naked)) _gaunt_start(void)
 	::: "r0", "r1", "r2", "r4", "r5");
 	
 	gInterruptCount = 1;
+
+	*LPC11U00::IOConfigPIO0_11 = (*LPC11U00::IOConfigPIO0_11 & ~LPC11U00::IOConfigPIO_FunctionMask) | LPC11U00::IOConfigPIO0_11_Function_PIO;
+	*LPC11U00::IOConfigPIO0_12 = (*LPC11U00::IOConfigPIO0_12 & ~LPC11U00::IOConfigPIO_FunctionMask) | LPC11U00::IOConfigPIO0_12_Function_PIO;
+	*LPC11U00::IOConfigPIO0_13 = (*LPC11U00::IOConfigPIO0_13 & ~LPC11U00::IOConfigPIO_FunctionMask) | LPC11U00::IOConfigPIO0_13_Function_PIO;
+	*LPC11U00::IOConfigPIO0_14 = (*LPC11U00::IOConfigPIO0_14 & ~LPC11U00::IOConfigPIO_FunctionMask) | LPC11U00::IOConfigPIO0_14_Function_PIO;
+
 	main();
 	HardFault_Handler();
 }
@@ -291,7 +297,7 @@ extern "C" void STARTUP Reset(void)
 
 extern "C" void STARTUP INTERRUPT ignoreInterrupt(void)
 {
-	unsigned int activeInterrupt = (*LPC11U00::InterruptControlAndState & LPC11U00::ActiveVector__Mask);
+	unsigned int activeInterrupt = (*LPC11U00::InterruptControl & LPC11U00::InterruptControl_ActiveVector__Mask);
 
 	if(activeInterrupt > 16)
 		activeInterrupt -= 16;

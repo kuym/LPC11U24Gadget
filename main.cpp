@@ -176,9 +176,9 @@ int main(void)
 
 	USBCDCDevice cdcDevice(256, 256);
 
-	USB::RegisterHandler((unsigned char const*)&kCDCACMConfigurationDescriptor, &USBCDCDevice::USBCDCACMHandler, &cdcDevice);
-	USB::RegisterHandler((unsigned char const*)&kCDCACMConfigurationDescriptor.endpoint1_0, &USBCDCDevice::USBCDCACMHandler, &cdcDevice);
-	USB::RegisterHandler((unsigned char const*)&kCDCACMConfigurationDescriptor.endpoint1_1, &USBCDCDevice::USBCDCACMHandler, &cdcDevice);
+	USB::RegisterHandler((unsigned char const*)&kCDCACMConfigurationDescriptor, &USBCDCDevice::usbCDCACMHandler, &cdcDevice);
+	USB::RegisterHandler((unsigned char const*)&kCDCACMConfigurationDescriptor.endpoint1_0, &USBCDCDevice::usbCDCACMHandler, &cdcDevice);
+	USB::RegisterHandler((unsigned char const*)&kCDCACMConfigurationDescriptor.endpoint1_1, &USBCDCDevice::usbCDCACMHandler, &cdcDevice);
 
 	ErrorCode error = USB::Start();
 	if(error != ErrorCode_OK)

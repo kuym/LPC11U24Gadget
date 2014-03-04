@@ -196,23 +196,25 @@ enum USBCDC_State
 struct __attribute__((aligned(4))) USBCDCDevice
 {
 public:
-	inline bool			connected() volatile const		{return(((USBCDCDevice volatile*)this)->isConnected);}
-	inline unsigned int	bytesAvailable() volatile const	{return(readBuffer.used());}	// ...to read
-	inline unsigned int	bytesFree() volatile const		{return(writeBuffer.free());}	// ...in which to write
+	inline bool			connected() volatile const		{return(((USBCDCDevice volatile*)this)->_connected);}
+	inline unsigned int	bytesAvailable() volatile const	{return(_readBuffer.used());}	// ...to read
+	inline unsigned int	bytesFree() volatile const		{return(_writeBuffer.free());}	// ...in which to write
 
 						USBCDCDevice(unsigned int readBufferSize, unsigned int writeBufferSize);
 
-	unsigned int		Read(unsigned char* outData, unsigned int length);
-	unsigned int		Write(unsigned char const* data, unsigned int length);
+	unsigned int		read(unsigned char* outData, unsigned int length);
+	unsigned char		readByte(void);
+	unsigned int		write(unsigned char const* data, unsigned int length);
+	void				writeByte(unsigned char b);
 	
-	static ErrorCode	USBCDCACMHandler(void* context, USBDescriptorHeader const* endpoint, USBSetup const* setupPacket);
+	static ErrorCode	usbCDCACMHandler(void* context, USBDescriptorHeader const* endpoint, USBSetup const* setupPacket);
 
 private:
-	USBCDCLineCoding	lineCoding;
-	unsigned int		expecting;
-	unsigned int		isConnected;
-	CircularBuffer		readBuffer;
-	CircularBuffer		writeBuffer;
+	USBCDCLineCoding	_lineCoding;
+	unsigned int		_expecting;
+	unsigned int		_connected;
+	CircularBuffer		_readBuffer;
+	CircularBuffer		_writeBuffer;
 };
 
 #endif //!defined __USBCDC_H__

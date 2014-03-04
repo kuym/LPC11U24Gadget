@@ -9,6 +9,33 @@ void delayMicro(unsigned int us);
 
 extern "C" void vmemset(void volatile* dest, unsigned int value, unsigned int length);
 
+enum Pin
+{
+	// Gnd								// Gadget pin 1
+	// 3v3								// Gadget pin 2
+	Pin_A1 =		((0 << 5) | 12),	// Gadget pin 3
+	Pin_A2 =		((0 << 5) | 13),	// Gadget pin 4
+	Pin_A3 =		((0 << 5) | 14),	// Gadget pin 5
+	Pin_A5 =		((0 << 5) | 16),	// Gadget pin 6
+	Pin_SCK1 =		((1 << 5) | 15),	// Gadget pin 7
+	Pin_RXD =		((0 << 5) | 18),	// Gadget pin 8
+	Pin_TXD =		((0 << 5) | 19),	// Gadget pin 9
+	Pin_nCS1 =		((1 << 5) | 19),	// Gadget pin 10
+	Pin_nRESET =	((0 << 5) | 0),		// Gadget pin 11
+	Pin_P0 =		((0 << 5) | 1),		// Gadget pin 12
+	Pin_nCS0 =		((0 << 5) | 2),		// Gadget pin 13
+	Pin_SCL =		((0 << 5) | 4),		// Gadget pin 14
+	Pin_SDA =		((0 << 5) | 5),		// Gadget pin 15
+	Pin_MOSI1 =		((0 << 5) | 21),	// Gadget pin 16
+	Pin_SCK0 =		((0 << 5) | 6),		// Gadget pin 17
+	Pin_MISO0 =		((0 << 5) | 8),		// Gadget pin 18
+	Pin_MOSI0 =		((0 << 5) | 9),		// Gadget pin 19
+	Pin_MISO1 =		((0 << 5) | 22),	// Gadget pin 20
+	Pin_A0 =		((0 << 5) | 11),	// Gadget pin 21
+	// Vin								// Gadget pin 22
+	Pin_SWCLK =		((0 << 5) | 10),	// Gadget pin 23
+	Pin_SWDIO =		((0 << 5) | 15),	// Gadget pin 24
+};
 
 ////////////////////////////////////////////////////////////////
 // NumberFormatter
@@ -33,20 +60,22 @@ public:
 class CircularBuffer
 {
 public:
-	inline int	size() volatile const	{return(_p[0]);}
-	inline int	used() volatile const	{return(_p[2]);}
-	inline int	free() volatile const	{return(_p[0] - _p[2]);}
+	inline int		size() volatile const	{return(_p[0]);}
+	inline int		used() volatile const	{return(_p[2]);}
+	inline int		free() volatile const	{return(_p[0] - _p[2]);}
 	
-				CircularBuffer(void);
-				~CircularBuffer(void);
+					CircularBuffer(void);
+					~CircularBuffer(void);
 	
-	bool		alloc(int bufferSize);
-	void		dealloc(void);
-	void		reset(void);
+	bool			alloc(int bufferSize);
+	void			dealloc(void);
+	void			reset(void);
 	
-	int			read(unsigned char* out, int length);
+	int				read(unsigned char* out, int length);
+	unsigned char	readByte(void);
 
-	int			write(unsigned char const* in, int length);
+	int				write(unsigned char const* in, int length);
+	void			writeByte(unsigned char b);
 
 private:
 	inline int				L(void) const
