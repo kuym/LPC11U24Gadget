@@ -53,6 +53,8 @@ unsigned int		USBCDCDevice::write(unsigned char const* data, unsigned int length
 	//unsigned char buffer[64];
 	//unsigned int chunkLen
 	
+	unsigned char notification[8] = {0xA1, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+	USB::Write(0x81, notification, 8);	// @@hack
 	return(USB::Write(0x83, (unsigned char*)data, length));	// @@bad bad bad hack
 }
 
@@ -83,6 +85,7 @@ ErrorCode			USBCDCDevice::usbCDCACMHandler(void* context, USBDescriptorHeader co
 	*/
 	// end debug
 
+	//UART::writeSync("#");
 	USBCDCDevice* state = (USBCDCDevice*)context;
 
 	if(setupPacket != 0)
@@ -157,10 +160,10 @@ ErrorCode			USBCDCDevice::usbCDCACMHandler(void* context, USBDescriptorHeader co
 		unsigned char buffer[64];
 		unsigned int bytesRead = USB::Read(endpointAddress, buffer);
 		
-		UART::writeSync("\nep2 rd:");
-		UART::writeSync(bytesRead, NumberFormatter::DecimalUnsigned);
-		UART::writeSync(">");
-		UART::writeHexDumpSync(buffer, bytesRead);
+		//UART::writeSync("\nep2 rd:");
+		//UART::writeSync(bytesRead, NumberFormatter::DecimalUnsigned);
+		//UART::writeSync(">");
+		//UART::writeHexDumpSync(buffer, bytesRead);
 
 		state->_readBuffer.write(buffer, bytesRead);
 

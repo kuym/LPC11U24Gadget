@@ -1,4 +1,5 @@
 #include <LPC11U00.h>
+#include <string.h>
 
 #define MEMORY_SRAM_TOP (0x10000000UL + 8192)
 
@@ -6,6 +7,15 @@
 
 #define WEAK_IGNORE __attribute__ ((weak, alias("ignoreInterrupt")))
 #define STARTUP	__attribute__ ((section(".startup"), used))
+
+extern unsigned int _stext, _sidata, _sdata, _edata, _sbss, _ebss;
+
+typedef void (*Ctor)(void);
+extern Ctor __init_start;
+extern Ctor __init_end;
+
+extern int __heap_start__;
+extern int __heap_end__;
 
 extern "C"
 {
@@ -173,42 +183,42 @@ static signed int volatile gInterruptCount;	// interrupts initially disabled at 
 extern "C" void STARTUP __attribute__((naked)) _gaunt_start(void)
 {
 	__asm__ volatile (
-	"cpsid		i				\n"		//disable interrupts
-	"mov		r0,		#0		\n"
-	"ldr		r1,		[r0, #0]\n"		//$sp = *(void**)0	//load SP from address 0. Yes, the hardware does this, but not
-	"mov		sp,		r1		\n"							//  if you manually vector to _start during e.g. debugging or soft-reset
-	"mov		r2,		#2		\n"
-	"msr		CONTROL, r2		\n"		//switch to Process SP
-	"mov		sp,		r1		\n"		//set PSP = MSP
-	"msr		CONTROL, r0		\n"		//switch back to Main SP
-	"ldr		r0,		=0x40048000\n"	//there are some odd scenarios (noticed during debugging) where the ROM bootloader/seed doesn't
-	"str		r2,		[r0, #0]\n"		//  set this correctly.
-	
-	//annoyingly, I couldn't get this to generate correct asm, hence the inline asm version below
-	// void (**p)(void) = __init_end;
-	// while(p-- != __init_start)
-	//   (*p)();
-	
-	"ldr		r4,		=__init_end		\n"
-	"ldr		r5,		=__init_start	\n"
-	"._start_next_ctor:					\n"
-	"cmp		r4, r5					\n"
-	"beq		._start_ctors_done		\n"
-	"sub		r4,		#4				\n"
-	"ldr		r0, [r4, #0]			\n"
-	"blx		r0						\n"		//r4 and r5 are chosen above because ATPCS guarantees they won't be trampled here
-	"b			._start_next_ctor		\n"
-	"._start_ctors_done:				\n"
-	::: "r0", "r1", "r2", "r4", "r5");
-	
-	gInterruptCount = 1;
+	"cpsid		i						\n"		// disable interrupts
+	"ldr		r0,		=_stext			\n"
+	"ldr		r1,		[r0, #0]		\n"		// $sp = *(void**)(&_stext)	//load SP from address 0. Yes, the hardware does this, but not
+	"mov		sp,		r1				\n"							//  if you manually vector to _start during e.g. debugging or soft-reset
+	"mov		r2,		#2				\n"
+	"msr		CONTROL, r2				\n"		// switch to Process SP
+	"mov		sp,		r1				\n"		// set PSP = MSP
+	"msr		CONTROL, r0				\n"		// switch back to Main SP
+	"ldr		r0,		=0x40048000		\n"		// there are some odd scenarios (noticed during debugging) where the ROM bootloader/seed doesn't
+	"str		r2,		[r0, #0]		\n"		//   set this correctly.
+	::: "r0", "r1", "r2");
 
+	// copy the .data segment to SRAM
+	memcpy(&_sdata, &_sidata, (&_edata - &_sdata) * sizeof(unsigned int));
+
+	// clear the bss segment in SRAM
+	memset(&_sbss, 0, (&_ebss - &_sbss) * sizeof(unsigned int));
+
+	// run each constructor
+	Ctor* c = &__init_start;
+	while(c < &__init_end)
+		(*c++)();					// <= the joy of C
+
+	// initialize heap
+	*(unsigned int*)(&__heap_start__) = (&__heap_end__ - &__heap_start__);
+	
 	*LPC11U00::IOConfigPIO0_11 = (*LPC11U00::IOConfigPIO0_11 & ~LPC11U00::IOConfigPIO_FunctionMask) | LPC11U00::IOConfigPIO0_11_Function_PIO;
 	*LPC11U00::IOConfigPIO0_12 = (*LPC11U00::IOConfigPIO0_12 & ~LPC11U00::IOConfigPIO_FunctionMask) | LPC11U00::IOConfigPIO0_12_Function_PIO;
 	*LPC11U00::IOConfigPIO0_13 = (*LPC11U00::IOConfigPIO0_13 & ~LPC11U00::IOConfigPIO_FunctionMask) | LPC11U00::IOConfigPIO0_13_Function_PIO;
 	*LPC11U00::IOConfigPIO0_14 = (*LPC11U00::IOConfigPIO0_14 & ~LPC11U00::IOConfigPIO_FunctionMask) | LPC11U00::IOConfigPIO0_14_Function_PIO;
-
+	
+	gInterruptCount = 1;
+	
 	main();
+	
+	// if the application returns from main(), that's a hardfault
 	HardFault_Handler();
 }
 

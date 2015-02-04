@@ -3,6 +3,9 @@
 #include <USBAPI.h>
 #include <USBCDC.h>
 #include <string.h>
+#include <stdlib.h>
+
+#define MIN(a, b)	((a < b)? (a) : (b))
 
 using namespace LPC11U00;
 
@@ -12,7 +15,7 @@ static USBDescriptorDevice const __attribute__((aligned(4))) kDeviceDescriptor =
 {
 	.header					= {.size = sizeof(USBDescriptorDevice), .type = DescriptorType_Device},
 
-	.usbSpecification		= 0x0110,
+	.usbSpecification		= 0x0200,
 	.deviceClass			= 0x02,
 	.subClass				= 0x00,
 	.protocol				= 0x00,
@@ -147,6 +150,8 @@ extern "C" void		USB_IRQHandler(void)
 	USB::Interrupt();
 }
 
+void	onI2CCompletion(int id, unsigned char* p, unsigned int len, void* context);
+
 int main(void)
 {
 	__asm__ volatile ("cpsid i"::);
@@ -192,6 +197,12 @@ int main(void)
 	USB::Connect();
 	UART::writeSync("\nConnected");
 
+	I2C::start(100000);
+
+	bool reset = true;
+	unsigned char* i2cCommandBuffer = new unsigned char[256];
+	unsigned int i2cCommandIndex = 0, i2cCommandParseState = 0, i2cLength = 0;
+
 	while(true)
 	{
 		//__asm__ volatile ("wfi"::);
@@ -219,22 +230,81 @@ int main(void)
 		
 		if(cdcDevice.connected())
 		{
-			UART::writeSync("\nconn");
-
 			int length;
 			while((length = cdcDevice.bytesAvailable()) > 0)
 			{
-				UART::writeSync("\necho:0x");
-				UART::writeSync(length, NumberFormatter::Hexadecimal);
+				if(reset)
+				{
+					i2cCommandIndex = 0;
+					i2cCommandParseState = 0;
+					i2cLength = 0;
+					reset = false;
+				}
 
-				unsigned char buffer[11];
-				unsigned int bytesRead = cdcDevice.Read(buffer, 10);
+				unsigned int bytesRead = cdcDevice.read(i2cCommandBuffer + i2cCommandIndex, 256 - i2cCommandIndex);
 
-				buffer[bytesRead] = '|';
+				if(bytesRead > 0)
+				{
+					// parse command(s)
+					unsigned int end = i2cCommandIndex + bytesRead, available = 0;
+					while(i2cCommandIndex < end)
+					{
+						switch(i2cCommandParseState)
+						{
+						case 0:
+							i2cCommandIndex++;
+							i2cCommandParseState++;
+							break;
 
-				cdcDevice.Write(buffer, bytesRead + 1);
+						case 1:
+							i2cLength = i2cCommandBuffer[i2cCommandIndex++];
+
+							if(i2cCommandBuffer[0] & 1)
+							{
+								I2C::write(i2cCommandBuffer[0], 0, i2cLength, &onI2CCompletion, (void*)&cdcDevice);
+								goto advance;
+							}
+							else
+								i2cCommandParseState++;
+							//(intentional)
+						case 2:
+							available = MIN(end - i2cCommandIndex, i2cLength);
+							i2cCommandIndex += available;
+							i2cLength -= available;
+							if(i2cLength == 0)
+							{
+								I2C::write(i2cCommandBuffer[0], i2cCommandBuffer + 2, i2cCommandBuffer[1], &onI2CCompletion, (void*)&cdcDevice);
+								goto advance;
+							}
+							break;
+
+						advance:
+							memcpy(i2cCommandBuffer, i2cCommandBuffer + i2cCommandIndex, end - i2cCommandIndex);
+							end -= i2cCommandIndex;
+							i2cCommandParseState = 0;
+							i2cCommandIndex = 0;
+							break;
+						}
+					}
+				}
 			}
 		}
+		else
+			reset = true;
 		__asm__ volatile ("wfi"::);
 	}
 }
+
+void	onI2CCompletion(int id, unsigned char* p, unsigned int len, void* context)
+{
+	USBCDCDevice* cdcDevice = (USBCDCDevice*)context;
+
+	unsigned char* buffer = (unsigned char*)alloca(2 + (p? len : 0));
+	buffer[0] = (unsigned char)id;
+	buffer[1] = (unsigned char)len;
+	if(p)
+		memcpy(buffer + 2, p, len);
+	
+	cdcDevice->write(buffer, 2 + (p? len : 0));
+}
+

@@ -179,6 +179,7 @@ public:
 	static void				writeSync(unsigned int value, NumberFormatter::Base format = NumberFormatter::DecimalSigned);
 	
 	static void				writeHexDumpSync(unsigned char const* bytesOut, int length);
+	static void				writeHexIntSync(unsigned int value, int minLength = 0);
 
 	static void				flush(void);
 };
@@ -225,5 +226,19 @@ public:
 private:
 	unsigned int	deviceNum;
 };
+
+////////////////////////////////////////////////////////////////
+// I2C
+
+typedef void (*TaskCallback)(int id, unsigned char* bytesRead, unsigned int length, void* context);
+
+class I2C
+{
+public:
+	static void			start(int bitRate);
+	static inline void	stop(void)	{start(0);}
+	static int			write(unsigned char address, void* data, unsigned int length, TaskCallback completion, void* context);
+};
+
 
 #endif //_LPC11U00API_H_

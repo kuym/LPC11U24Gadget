@@ -733,6 +733,25 @@ namespace LPC11U00
 	REGISTER	UARTTransmitEnabled =		REGISTER_ADDRESS(0x40008030);
 
 	////////////////////////////////////////////////////////////////
+	
+	REGISTER	I2CControlSet =				REGISTER_ADDRESS(0x40000000);
+	REGISTER	I2CControlClear =			REGISTER_ADDRESS(0x40000018);
+		enum I2CControlSet
+		{
+			I2CControlSet_Ack				=	(0x04),
+			I2CControlSet_Interrupt			=	(0x08),
+			I2CControlSet_StopCondition		=	(0x10),		// do not clear I2CControlSet_StopCondition
+			I2CControlSet_StartCondition	=	(0x20),
+			I2CControlSet_EnableI2C			=	(0x40),
+		};
+	REGISTER	I2CStatus =					REGISTER_ADDRESS(0x40000004);
+	REGISTER	I2CData =					REGISTER_ADDRESS(0x40000008);
+	REGISTER	I2CBuffer =					REGISTER_ADDRESS(0x4000002C);
+
+	REGISTER	I2CClockHighTime =			REGISTER_ADDRESS(0x40000010);
+	REGISTER	I2CClockLowTime =			REGISTER_ADDRESS(0x40000014);
+	
+	////////////////////////////////////////////////////////////////
 
 	REGISTER USBDeviceCommandStatus = REGISTER_ADDRESS(0x40080000);
 	

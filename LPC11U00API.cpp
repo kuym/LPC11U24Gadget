@@ -435,6 +435,12 @@ void				UART::writeHexDumpSync(unsigned char const* bytesOut, int length)
 		*LPC11U00::UARTData = hex[b & 0xF];
 	}
 }
+void				UART::writeHexIntSync(unsigned int value, int minLength)
+{
+	int length = (value >= 0x10000)? (value >= 0x1000000)? 4 : 3 : (value >= 0x100)? 2 : 1;
+	value = __builtin_bswap32(value);
+	writeHexDumpSync(((unsigned char*)&value) + (4 - length), (length > minLength)? length : minLength);
+}
 void				UART::flush(void)
 {
 	while(!(*UARTLineStatus & UARTLineStatus_TransmitterEmpty));
@@ -543,13 +549,241 @@ void			SPI::start(int bitRate, Mode mode, Role role)
 			*IOConfigPIO0_21 = (*IOConfigPIO0_9 & ~IOConfigPIO_FunctionMask);
 			*IOConfigPIO1_19 = (*IOConfigPIO1_19 & ~IOConfigPIO_FunctionMask);
 		}
-		
-		/*
-			InterruptFreeEnter();
-			
-				IOCore.flushQueue((IOCore::TaskQueueItem**)&IOCore.spiCurrentTask);
-			
-			InterruptFreeLeave();
-		*/
 	}
 }
+
+
+
+
+////////////////////////////////////////////////////////////////
+// I2C
+
+static unsigned int gTaskID = 0;
+
+struct TaskQueueItem
+{
+	TaskQueueItem*	next;
+	int				id;
+	TaskCallback	completion;
+	void*			context;
+
+	TaskQueueItem(TaskCallback callback, void* userContext):
+		next(0),
+		completion(callback),
+		context(userContext)
+	{
+		id = ++gTaskID;
+	}
+};
+
+void	queueItem(TaskQueueItem** list, TaskQueueItem* task)
+{
+	while(*list)	list = &((*list)->next);
+	*list = task;
+}
+void	flushQueue(TaskQueueItem** list)
+{
+	while(*list)
+	{
+		TaskQueueItem** t = list;
+		list = &((*list)->next);
+		delete[] (unsigned char*)*t;
+		*t = 0;
+	}
+}
+
+struct I2CTask: TaskQueueItem
+{
+	unsigned short	len;
+	unsigned short	idx;
+	unsigned char	data[1];
+
+	void*			operator new(size_t s, size_t length)
+	{
+		return(new unsigned char[s + 1 + length]);
+	}
+	void			operator delete(void* p)
+	{
+		delete[] (unsigned char*)p;
+	}
+
+					I2CTask(unsigned int length, TaskCallback callback, void* userContext):
+						TaskQueueItem(callback, userContext),
+						len(length),
+						idx(0)
+	{
+	}
+};
+
+
+static I2CTask* gI2cCurrentTask = 0;
+
+bool				i2cRepeatedStart(I2CTask* currentTask)
+{
+	return(		(currentTask->next != 0)
+				&& ((((I2CTask*)(currentTask->next))->data[0] | 1) == (currentTask->data[0] | 1))	//same slave?
+			);
+}
+
+void				i2cCompletePacket(I2CTask* currentTask, bool success)
+{
+	gI2cCurrentTask = (I2CTask*)currentTask->next;
+	
+	if(currentTask->completion != 0)
+		currentTask->completion(	currentTask->id,
+									(success && (currentTask->data[0] & 1))? (currentTask->data + 1) : 0,
+									(currentTask->data[0] & 1)? currentTask->len : currentTask->idx,
+									currentTask->context
+								);
+
+	delete currentTask;
+
+	if(gI2cCurrentTask != 0)
+		*I2CControlSet = I2CControlSet_StartCondition;
+}
+
+extern "C"
+void	I2C_IRQHandler(void)
+{
+	int status = *I2CStatus;
+	I2CTask* currentTask = gI2cCurrentTask;
+
+	switch(status)
+	{
+	case 0x08:	//start bit sent
+	case 0x10:	//repeated start
+		*I2CData = currentTask->data[0];
+		*I2CControlClear = I2CControlSet_StartCondition;
+		break;
+		
+	case 0x20:	//write address NACKed, stop
+	case 0x48:	//read address NACKed, stop
+		*I2CControlSet = I2CControlSet_StopCondition;
+		i2cCompletePacket(currentTask, false);
+		break;
+		
+	case 0x40:	//read address ACKed, ready to read
+		if(currentTask->len > 1)	*I2CControlSet = I2CControlSet_Ack;
+		break;
+	
+	case 0x18:	//write address ACKed, ready to write
+	case 0x28:	//byte sent, ACK received
+		if(currentTask->idx < currentTask->len)
+		{
+			*I2CData = currentTask->data[++currentTask->idx];
+			break;
+		}
+		goto repeatedStart;
+		
+	case 0x58:	//byte received, NACK sent
+		currentTask->data[++currentTask->idx] = *I2CData;
+
+	repeatedStart:
+		if(i2cRepeatedStart(currentTask))	*I2CControlSet = I2CControlSet_StartCondition;
+		else								*I2CControlSet = I2CControlSet_StopCondition;
+		i2cCompletePacket(currentTask, true);
+		break;
+		
+	case 0x30:	//byte sent, NACK received
+		*I2CControlSet = I2CControlSet_StopCondition;
+		i2cCompletePacket(currentTask, false);
+		break;
+		
+	case 0x50:	//byte received, ACK sent
+		currentTask->data[++currentTask->idx] = *I2CData;
+		
+		// +2 accounts for the address byte and the fact that we have to decide the response one byte ahead
+		if((currentTask->idx + 2) < currentTask->len)	*I2CControlSet = I2CControlSet_Ack;
+		else											*I2CControlClear = I2CControlSet_Ack;
+		
+		break;
+	
+	case 0x00:
+		*I2CControlSet = I2CControlSet_StopCondition;
+		// (intentional)
+
+	case 0xF8:
+		//protocol errors!
+		// (intentional)
+
+	default:
+		// (intentional)
+
+	case 0x38:	//arbitration loss, abort
+		i2cCompletePacket(currentTask, false);
+		break;
+	}
+	
+	*I2CControlClear = I2CControlSet_Interrupt;
+}
+
+void		I2C::start(int bitRate)
+{
+	*PeripheralnReset &= ~PeripheralnReset_I2C;	//assert reset
+	
+	interruptsDisabled();
+
+	//empty the queue in any case
+	flushQueue((TaskQueueItem**)&gI2cCurrentTask);
+	
+	if(bitRate > 0)
+	{
+		*ClockControl |= ClockControl_I2C;
+		*PeripheralnReset |= PeripheralnReset_I2C;	//deassert reset
+		
+		*IOConfigPIO0_4 = (*IOConfigPIO0_4 & ~IOConfigPIO0_4_Supported) | IOConfigPIO0_4_Function_SCL | IOConfigPIO0_4_I2CMode_StandardFast;
+		*IOConfigPIO0_5 = (*IOConfigPIO0_5 & ~IOConfigPIO0_5_Supported) | IOConfigPIO0_5_Function_SDA | IOConfigPIO0_5_I2CMode_StandardFast;
+		
+		*I2CControlClear = I2CControlSet_Ack | I2CControlSet_Interrupt
+							| I2CControlSet_StartCondition | I2CControlSet_EnableI2C;
+		
+		unsigned int bitHalfPeriod = (12000000UL / bitRate) >> 1;	// system.getCoreFrequency()
+		//@@depending on the time-constant of the bus (1 / (pull-up resistance * capacitance)),
+		//  the low-time should be smaller and the high-time should be higher
+		*I2CClockHighTime = bitHalfPeriod;
+		*I2CClockLowTime = bitHalfPeriod;
+		
+		//IOCore.irqI2C = IO_onI2CInterrupt;
+		//@@enable i2c interrupt
+		
+		//enable interrupt before enabling I2C state machine:
+		*InterruptEnableSet0 = Interrupt0_I2C;
+		*I2CControlSet = I2CControlSet_EnableI2C;
+	}
+	else
+	{
+		*IOConfigPIO0_4 = (*IOConfigPIO0_4 & ~IOConfigPIO0_4_Supported);
+		*IOConfigPIO0_5 = (*IOConfigPIO0_5 & ~IOConfigPIO0_5_Supported);
+		
+		*I2CControlClear = I2CControlSet_Ack | I2CControlSet_Interrupt
+							| I2CControlSet_StartCondition | I2CControlSet_EnableI2C;
+		
+		//shut down I2C clock
+		*ClockControl &= ~ClockControl_I2C;
+		*InterruptEnableClear0 = Interrupt0_I2C;
+	}
+	interruptsEnabled();
+}
+
+int		I2C::write(unsigned char address, void* data, unsigned int length, TaskCallback completion, void* context)
+{
+	if(!(*PeripheralnReset | PeripheralnReset_I2C))	//if in reset mode, I2C system is inactive and this job should fail.
+		return(0);
+	
+	I2CTask* i2cTask = new(length) I2CTask(length, completion, context);
+	i2cTask->data[0] = address;
+	if(!(address & 1))
+		memcpy(i2cTask->data + 1, data, length);
+	
+	interruptsDisabled();
+		bool mustStart = (gI2cCurrentTask == 0);
+		queueItem((TaskQueueItem**)&gI2cCurrentTask, i2cTask);
+		
+		if(mustStart)
+			*I2CControlSet = I2CControlSet_StartCondition;
+		
+	interruptsEnabled();
+	
+	return(i2cTask->id);
+}
+

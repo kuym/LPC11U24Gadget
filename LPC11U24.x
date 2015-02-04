@@ -8,7 +8,7 @@ SECTIONS
 {
 	.text :
 	{
-		PROVIDE(stext = .);
+		PROVIDE(_stext = .);
 		KEEP(*(.isr_vector .isr_vector.*))
 		*(.startup .startup.*)
 
