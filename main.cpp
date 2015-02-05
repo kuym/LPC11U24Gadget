@@ -151,6 +151,7 @@ extern "C" void		USB_IRQHandler(void)
 }
 
 void	onI2CCompletion(int id, unsigned char* p, unsigned int len, void* context);
+void	onI2CMonitor(int address, unsigned char* p, unsigned int len, void* context);
 
 int main(void)
 {
@@ -197,12 +198,12 @@ int main(void)
 	USB::Connect();
 	UART::writeSync("\nConnected");
 
-	I2C::start(100000);
-
 	bool reset = true;
 	unsigned char* i2cCommandBuffer = new unsigned char[256];
 	unsigned int i2cCommandIndex = 0, i2cCommandParseState = 0, i2cLength = 0;
 
+	//I2C::monitor(256, &onI2CMonitor, (void*)&cdcDevice);
+	
 	while(true)
 	{
 		//__asm__ volatile ("wfi"::);
@@ -235,6 +236,8 @@ int main(void)
 			{
 				if(reset)
 				{
+					I2C::start(100000);
+
 					i2cCommandIndex = 0;
 					i2cCommandParseState = 0;
 					i2cLength = 0;
@@ -290,7 +293,13 @@ int main(void)
 			}
 		}
 		else
-			reset = true;
+		{
+			if(!reset)
+			{
+				I2C::stop();
+				reset = true;
+			}
+		}
 		__asm__ volatile ("wfi"::);
 	}
 }
@@ -301,6 +310,19 @@ void	onI2CCompletion(int id, unsigned char* p, unsigned int len, void* context)
 
 	unsigned char* buffer = (unsigned char*)alloca(2 + (p? len : 0));
 	buffer[0] = (unsigned char)id;
+	buffer[1] = (unsigned char)len;
+	if(p)
+		memcpy(buffer + 2, p, len);
+	
+	cdcDevice->write(buffer, 2 + (p? len : 0));
+}
+
+void	onI2CMonitor(int address, unsigned char* p, unsigned int len, void* context)
+{
+	USBCDCDevice* cdcDevice = (USBCDCDevice*)context;
+
+	unsigned char* buffer = (unsigned char*)alloca(2 + (p? len : 0));
+	buffer[0] = (unsigned char)address;
 	buffer[1] = (unsigned char)len;
 	if(p)
 		memcpy(buffer + 2, p, len);

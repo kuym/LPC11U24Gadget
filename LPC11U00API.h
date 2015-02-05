@@ -237,7 +237,13 @@ class I2C
 public:
 	static void			start(int bitRate);
 	static inline void	stop(void)	{start(0);}
+	
 	static int			write(unsigned char address, void* data, unsigned int length, TaskCallback completion, void* context);
+	static inline int	read(unsigned char address, unsigned int length, TaskCallback completion, void* context)
+							{return(write(address, 0, length, completion, context));}
+	
+	static void			monitor(unsigned int maxLength, TaskCallback callback, void* context);
+	static inline void	monitorOff(void)	{monitor(0, 0, 0);}
 };
 
 

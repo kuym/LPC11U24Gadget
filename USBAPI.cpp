@@ -95,12 +95,10 @@ static ErrorCode	registerHandlersFromDescriptor(unsigned char const* descriptor,
 																			);
 		if(registerError != 0)
 		{
-			/*
 			UART::writeSync("\nreg EP 0x");
 			UART::writeSync(((USBDescriptorEndpoint*)ep)->endpointAddress, NumberFormatter::Hexadecimal);
 			UART::writeSync(" err: ");
 			UART::writeSync(registerError, NumberFormatter::Hexadecimal);
-			*/
 			return(registerError);
 		}
 		index++;
@@ -125,25 +123,26 @@ static ErrorCode	packetHandler(		USBHandle usb,
 									)
 {
 	(void)usb;
-	/*
+
+#ifdef USB_DEBUG
 	UART::writeSync("\n$");
 	UART::writeHexIntSync((unsigned int)usb, 4);
 	UART::writeSync("/");
 	UART::writeHexIntSync((unsigned int)closure, 4);
 	UART::writeSync(":");
 	UART::writeHexIntSync((unsigned int)endpointEvent);
-	*/
+#endif //USB_DEBUG
 
 	USBDescriptorConfigurationHeader* descriptor = 0;
 	if(((USBDescriptorHeader const*)closure)->type == DescriptorType_Configuration)
 		descriptor = (USBDescriptorConfigurationHeader*)closure;
 
-	/*
+#ifdef USB_DEBUG
 	UART::writeSync("\npkt:");
 	UART::writeSync(descriptor? 0 : ((USBDescriptorEndpoint*)closure)->endpointAddress, NumberFormatter::Hexadecimal);
 	UART::writeSync(",");
 	UART::writeSync(endpointEvent, NumberFormatter::Hexadecimal);
-	*/
+#endif //USB_DEBUG
 	
 	switch(endpointEvent)
 	{
@@ -153,8 +152,10 @@ static ErrorCode	packetHandler(		USBHandle usb,
 
 			(*API)->usb->hardware->EndpointReadSetup(gUSBAPIHandle, 0, (unsigned int*)&setupPacket);
 			
-			//UART::writeSync("\nbR:");
-			//UART::writeHexDumpSync((unsigned char const*)&setupPacket, sizeof(setupPacket));
+#ifdef USB_DEBUG
+			UART::writeSync("\nbR:");
+			UART::writeHexDumpSync((unsigned char const*)&setupPacket, sizeof(setupPacket));
+#endif //USB_DEBUG
 			
 			gUSBState.lastSetupType = setupPacket.bmRequestType;
 
@@ -326,8 +327,12 @@ static ErrorCode	standardSetupHandler(	void* context,
 											)) != 0)
 			{
 				unsigned int addr = ((USBDescriptorEndpoint*)ep)->endpointAddress;
-				//UART::writeSync("\nenEP");
-				//UART::writeSync(addr, NumberFormatter::Hexadecimal);
+				
+#ifdef USB_DEBUG
+				UART::writeSync("\nenEP");
+				UART::writeSync(addr, NumberFormatter::Hexadecimal);
+#endif //USB_DEBUG
+				
 				(*API)->usb->hardware->ConfigureEndpoint(gUSBAPIHandle, (USBDescriptorEndpoint*)ep);
 
 				(*API)->usb->hardware->EnableEndpoint(gUSBAPIHandle, addr);
