@@ -1,4 +1,6 @@
-extern "C" void exit(int reason)
+#include <stdlib.h>
+
+void exit(int reason)
 {
 	(void)reason;
 
@@ -6,8 +8,9 @@ extern "C" void exit(int reason)
 	while(1);
 }
 
-extern "C" void	memset(void* p, int value, unsigned long length)
+void*	memset(void* p, int value, size_t length)
 {
+	void* originalP = p;
 	while((((unsigned int)p) & 0x3) && (length > 0))
 	{
 		*(unsigned char*)p = (unsigned char)value;
@@ -35,20 +38,31 @@ extern "C" void	memset(void* p, int value, unsigned long length)
 		*(unsigned char*)p = (unsigned char)value;
 		p = (void*)(((unsigned char*)p) + 1);
 	}
+
+	return(originalP);
+}
+
+void		vmemset(void volatile* dest, unsigned int value, unsigned int length)
+{
+	volatile unsigned char* p = (volatile unsigned char*)dest;
+	for(unsigned int i = 0; i < length; i++)
+		*p++ = value;
 }
 
 
-extern "C" void	memcpy(void* dest, void const* src, unsigned long length)
+void*	memcpy(void* restrict dest, void const* restrict src, size_t length)
 {
+	void* originalDest = dest;
 	while(length--)
 	{
 		*(unsigned char*)dest = *(unsigned char*)src;
 		dest = ((unsigned char*)dest) + 1;
 		src = ((unsigned char*)src) + 1;
 	}
+	return(originalDest);
 }
 
-extern "C" unsigned long strlen(char const* str)
+unsigned long strlen(char const* str)
 {
 	unsigned long len = 0;
 	while(*str++ != '\0')
@@ -56,7 +70,7 @@ extern "C" unsigned long strlen(char const* str)
 	return(len);
 }
 
-extern "C" int __clzsi2(int a)
+int __clzsi2(int a)
 {
 	unsigned int x = (unsigned int)a;
 	int t = ((x & 0xFFFF0000) == 0) << 4;  /* if (x is small) t = 16 else 0 */
@@ -99,12 +113,11 @@ static inline unsigned int*	sp(void)
 	return(e);
 }
 
-void*			operator new[](unsigned int size)
+void*			malloc(size_t size)
 {
 	if(size == 0)
 		return((void*)~0);
 
-	//InterruptFreeEnter();
 	unsigned int* m = (unsigned int*)(&__heap_start__);
 	unsigned int* e = sp() - 8;	//leave a 32-byte margin
 
@@ -127,28 +140,21 @@ void*			operator new[](unsigned int size)
 			for(unsigned int i = 1; i < s; i++)	//zero memory
 				m[i] = 0;
 			
-			//InterruptFreeLeave();
 			return(m + 1);
 		}
 		m += bs;
 	}
-	//__asm volatile("bkpt 7"::);	//@@ Out-of-memory exception
-	
-	//effectively unreachable code:
-	//InterruptFreeLeave();
 	return((void*)~0);	// this ABI may fail new
 }
 
-void			operator delete[](void* allocation)
+void			free(void* allocation)
 {
 	unsigned int* a = (unsigned int*)allocation;
 	unsigned int* e = sp() - 8;	//leave a 32-byte margin
 	
-	//InterruptFreeEnter();
 	if((a < (unsigned int*)(&__heap_start__)) || (a >= e) || !(a[-1] & kHeapAllocated))
 	{
-		//InterruptFreeLeave();
-		return;	//@@throw?
+		return;
 	}
 	
 	a--;	//unwrap
@@ -176,8 +182,4 @@ void			operator delete[](void* allocation)
 	}
 	
 	*a = cbs;	//merge free blocks if contiguous
-	//InterruptFreeLeave();
 }
-
-void*			operator new(unsigned int size)		{return((void*)(new unsigned char[size]));}
-void			operator delete(void* allocation)	{delete (unsigned char*)allocation;}

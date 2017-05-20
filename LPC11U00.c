@@ -17,53 +17,47 @@ extern Ctor __init_end;
 extern int __heap_start__;
 extern int __heap_end__;
 
-extern "C"
-{
+int main(void);
 
-	int main(void);
+void ignoreInterrupt(void) INTERRUPT;
 
-	void ignoreInterrupt(void) INTERRUPT;
-
-	void _start(void) __attribute__ ((weak, alias("_gaunt_start"), used));
-	void _gaunt_start(void);
-	void HardFault_Handler(void) INTERRUPT;
-	void SVCall_Handler(void) WEAK_IGNORE;
-	void SysTick_Handler(void) WEAK_IGNORE;
+void _start(void) __attribute__ ((weak, alias("_gaunt_start"), used));
+void _gaunt_start(void);
+void HardFault_Handler(void) INTERRUPT;
+void SVCall_Handler(void) WEAK_IGNORE;
+void SysTick_Handler(void) WEAK_IGNORE;
 
 
-	void FLEX_INT0_IRQHandler(void) WEAK_IGNORE;
-	void FLEX_INT1_IRQHandler(void) WEAK_IGNORE;
-	void FLEX_INT2_IRQHandler(void) WEAK_IGNORE;
-	void FLEX_INT3_IRQHandler(void) WEAK_IGNORE;
-	void FLEX_INT4_IRQHandler(void) WEAK_IGNORE;
-	void FLEX_INT5_IRQHandler(void) WEAK_IGNORE;
-	void FLEX_INT6_IRQHandler(void) WEAK_IGNORE;
-	void FLEX_INT7_IRQHandler(void) WEAK_IGNORE;
-	void GINT0_IRQHandler(void) WEAK_IGNORE;
-	void GINT1_IRQHandler(void) WEAK_IGNORE;
-	void SSP1_IRQHandler(void) WEAK_IGNORE;
-	void I2C_IRQHandler(void) WEAK_IGNORE;
-	void TIMER16_0_IRQHandler(void) WEAK_IGNORE;
-	void TIMER16_1_IRQHandler(void) WEAK_IGNORE;
-	void TIMER32_0_IRQHandler(void) WEAK_IGNORE;
-	void TIMER32_1_IRQHandler(void) WEAK_IGNORE;
-	void SSP0_IRQHandler(void) WEAK_IGNORE;
-	void UART_IRQHandler(void) WEAK_IGNORE;
-	void USB_IRQHandler(void) WEAK_IGNORE;
-	void USB_FIQHandler(void) WEAK_IGNORE;
-	void ADC_IRQHandler(void) WEAK_IGNORE;
-	void WDT_IRQHandler(void) WEAK_IGNORE;
-	void BOD_IRQHandler(void) WEAK_IGNORE;
-	void FMC_IRQHandler(void) WEAK_IGNORE;
-	void USBWakeup_IRQHandler(void) WEAK_IGNORE;
+void FLEX_INT0_IRQHandler(void) WEAK_IGNORE;
+void FLEX_INT1_IRQHandler(void) WEAK_IGNORE;
+void FLEX_INT2_IRQHandler(void) WEAK_IGNORE;
+void FLEX_INT3_IRQHandler(void) WEAK_IGNORE;
+void FLEX_INT4_IRQHandler(void) WEAK_IGNORE;
+void FLEX_INT5_IRQHandler(void) WEAK_IGNORE;
+void FLEX_INT6_IRQHandler(void) WEAK_IGNORE;
+void FLEX_INT7_IRQHandler(void) WEAK_IGNORE;
+void GINT0_IRQHandler(void) WEAK_IGNORE;
+void GINT1_IRQHandler(void) WEAK_IGNORE;
+void SSP1_IRQHandler(void) WEAK_IGNORE;
+void I2C_IRQHandler(void) WEAK_IGNORE;
+void TIMER16_0_IRQHandler(void) WEAK_IGNORE;
+void TIMER16_1_IRQHandler(void) WEAK_IGNORE;
+void TIMER32_0_IRQHandler(void) WEAK_IGNORE;
+void TIMER32_1_IRQHandler(void) WEAK_IGNORE;
+void SSP0_IRQHandler(void) WEAK_IGNORE;
+void UART_IRQHandler(void) WEAK_IGNORE;
+void USB_IRQHandler(void) WEAK_IGNORE;
+void USB_FIQHandler(void) WEAK_IGNORE;
+void ADC_IRQHandler(void) WEAK_IGNORE;
+void WDT_IRQHandler(void) WEAK_IGNORE;
+void BOD_IRQHandler(void) WEAK_IGNORE;
+void FMC_IRQHandler(void) WEAK_IGNORE;
+void USBWakeup_IRQHandler(void) WEAK_IGNORE;
 
 
-	typedef void (*IRQVector)(void);
-
-}
+typedef void (*IRQVector)(void);
 
 //this is named "null" as a debugging enhancement and because nothing should depend on this symbol
-extern "C"
 IRQVector const null[] __attribute__ ((section(".isr_vector"), used)) =
 {
 	(IRQVector)STACK_TOP,	// Initial stack pointer value
@@ -119,58 +113,30 @@ IRQVector const null[] __attribute__ ((section(".isr_vector"), used)) =
 };
 
 ////////////////////////////////////////////////////////////////
-// ROM divider
-
-struct idivResult
-{
-	int				quotient;
-	int				remainder;
-};
-struct uidivResult
-{
-	unsigned int	quotient;
-	unsigned int	remainder;
-};
-
-struct DividerAPI
-{
-	int				(*sidiv)(int numerator, int denominator);
-	unsigned int	(*uidiv)(unsigned int numerator, unsigned int denominator);
-	idivResult		(*sidivmod)(int numerator, int denominator);
-	uidivResult 	(*uidivmod)(unsigned int numerator, unsigned int denominator);
-};
-
-struct USBAPI;
-
-struct LPCROMAPI
-{
-	USBAPI*				usb;
-	void*				_reserved[3];
-	DividerAPI*			divider;
-};
-
-LPCROMAPI** const ROMAPI = (LPCROMAPI**)0x1FFF1FF8;
-
-////////////////////////////////////////////////////////////////
 //
 // low-level assert functions provided for hard-fault handling and so on
 
-void			writeSync(char const* msg, int length = -1)
+static void			UARTWriteStringLengthSync(char const* msg, int length)
 {
 	while(((length == -1) && *msg) || (length-- > 0))
 	{
-		while(!(*LPC11U00::UARTLineStatus & LPC11U00::UARTLineStatus_TxHoldingRegisterEmpty));
-		*LPC11U00::UARTData = *msg++;
+		while(!(*UARTLineStatus & UARTLineStatus_TxHoldingRegisterEmpty));
+		*UARTData = *msg++;
 	}
 }
-void			writeSync(unsigned int v)
+static void			UARTWriteStringSync(char const* msg)
+{
+	UARTWriteStringLengthSync(msg, -1);
+}
+
+static void			UARTWriteHexSync(unsigned int v)
 {
 	static char const* hex = "0123456789ABCDEF";
 
 	for(int i = 0; i < 8; i++)
 	{
-		while(!(*LPC11U00::UARTLineStatus & LPC11U00::UARTLineStatus_TxHoldingRegisterEmpty));
-		*LPC11U00::UARTData = hex[v >> 28];
+		while(!(*UARTLineStatus & UARTLineStatus_TxHoldingRegisterEmpty));
+		*UARTData = hex[v >> 28];
 		v <<= 4;
 	}
 }
@@ -180,7 +146,7 @@ void			writeSync(unsigned int v)
 
 static signed int volatile gInterruptCount;	// interrupts initially disabled at boot
 
-extern "C" void STARTUP __attribute__((naked)) _gaunt_start(void)
+void STARTUP __attribute__((naked)) _gaunt_start(void)
 {
 	__asm__ volatile (
 	"cpsid		i						\n"		// disable interrupts
@@ -209,10 +175,10 @@ extern "C" void STARTUP __attribute__((naked)) _gaunt_start(void)
 	// initialize heap
 	*(unsigned int*)(&__heap_start__) = (&__heap_end__ - &__heap_start__);
 	
-	*LPC11U00::IOConfigPIO0_11 = (*LPC11U00::IOConfigPIO0_11 & ~LPC11U00::IOConfigPIO_FunctionMask) | LPC11U00::IOConfigPIO0_11_Function_PIO;
-	*LPC11U00::IOConfigPIO0_12 = (*LPC11U00::IOConfigPIO0_12 & ~LPC11U00::IOConfigPIO_FunctionMask) | LPC11U00::IOConfigPIO0_12_Function_PIO;
-	*LPC11U00::IOConfigPIO0_13 = (*LPC11U00::IOConfigPIO0_13 & ~LPC11U00::IOConfigPIO_FunctionMask) | LPC11U00::IOConfigPIO0_13_Function_PIO;
-	*LPC11U00::IOConfigPIO0_14 = (*LPC11U00::IOConfigPIO0_14 & ~LPC11U00::IOConfigPIO_FunctionMask) | LPC11U00::IOConfigPIO0_14_Function_PIO;
+	*IOConfigPIO0_11 = (*IOConfigPIO0_11 & ~IOConfigPIO_FunctionMask) | IOConfigPIO0_11_Function_PIO;
+	*IOConfigPIO0_12 = (*IOConfigPIO0_12 & ~IOConfigPIO_FunctionMask) | IOConfigPIO0_12_Function_PIO;
+	*IOConfigPIO0_13 = (*IOConfigPIO0_13 & ~IOConfigPIO_FunctionMask) | IOConfigPIO0_13_Function_PIO;
+	*IOConfigPIO0_14 = (*IOConfigPIO0_14 & ~IOConfigPIO_FunctionMask) | IOConfigPIO0_14_Function_PIO;
 	
 	gInterruptCount = 1;
 	
@@ -227,8 +193,8 @@ void			interruptsEnabled(void)
 	signed int count = --gInterruptCount;
 	if(count < 0)
 	{
-		writeSync("\nfault! intCnt=");
-		writeSync(count);
+		UARTWriteStringSync("\nfault! intCnt=");
+		UARTWriteHexSync(count);
 		__asm__ volatile ("bkpt 0x06"::);	// invalid interrupt-free refcount
 	}
 	else if (count == 0)
@@ -241,7 +207,7 @@ void			interruptsDisabled(void)
 	gInterruptCount++;
 }
 
-extern "C" void STARTUP INTERRUPT __attribute__((naked)) HardFault_Handler(void)
+void STARTUP INTERRUPT __attribute__((naked)) HardFault_Handler(void)
 {
 	//according to the ARM ARMv7-M A.R.M sec. B1-22, the NVIC stores the following
 	//  values in these places when vectoring to a handler:
@@ -264,8 +230,8 @@ extern "C" void STARTUP INTERRUPT __attribute__((naked)) HardFault_Handler(void)
 	
 	//a fault occurred at or near $sp[6]
 	
-	unsigned int volatile register faultPC;
-	unsigned int volatile register faultLR;
+	register unsigned int volatile faultPC;
+	register unsigned int volatile faultLR;
 	
 	__asm__ volatile (
 	"ldr	%0, 	[sp, #24]			\n"
@@ -274,11 +240,11 @@ extern "C" void STARTUP INTERRUPT __attribute__((naked)) HardFault_Handler(void)
 	:
 	: );
 	
-	writeSync("\nHardFault: pc=");
-	writeSync(faultPC);
-	writeSync(", lr=");
-	writeSync(faultLR);
-	writeSync("\nhalt.");
+	UARTWriteStringSync("\nHardFault: pc=");
+	UARTWriteHexSync(faultPC);
+	UARTWriteStringSync(", lr=");
+	UARTWriteHexSync(faultLR);
+	UARTWriteStringSync("\nhalt.");
 	
 	while(1);
 
@@ -288,37 +254,37 @@ extern "C" void STARTUP INTERRUPT __attribute__((naked)) HardFault_Handler(void)
 }
 
 /*
-extern "C" void STARTUP INTERRUPT _SVCall(void)
+void STARTUP INTERRUPT _SVCall(void)
 {
 }
 */
 
-extern "C" void STARTUP Sleep(void)
+void STARTUP Sleep(void)
 {
 	//@@enter PMU state
 	__asm__ volatile ("wfi"::);	//chip is sleeping, waiting for the next event.
 	//@@exit PMU state
 }
 
-extern "C" void STARTUP Reset(void)
+void STARTUP Reset(void)
 {
 	*((unsigned int volatile*)(0xE000ED0C)) = 0x05FA0004;	//invoke a hard reset
 }
 
-extern "C" void STARTUP INTERRUPT ignoreInterrupt(void)
+void STARTUP INTERRUPT ignoreInterrupt(void)
 {
-	unsigned int activeInterrupt = (*LPC11U00::InterruptControl & LPC11U00::InterruptControl_ActiveVector__Mask);
+	unsigned int activeInterrupt = (*InterruptControl & InterruptControl_ActiveVector__Mask);
 
 	if(activeInterrupt > 16)
 		activeInterrupt -= 16;
-	writeSync("\nUnhandledInt #");
-	writeSync(activeInterrupt);
+	UARTWriteStringSync("\nUnhandledInt #");
+	UARTWriteHexSync(activeInterrupt);
 }
 
 extern void* __attribute__ ((weak, alias("__dso_handle_nostdlib"))) __dso_handle;
 void* __dso_handle_nostdlib = 0;
 
-extern "C" int __aeabi_atexit(void* object, void (*destroyer)(void*), void* dso_handle)
+int __aeabi_atexit(void* object, void (*destroyer)(void*), void* dso_handle)
 {
 	(void)object;
 	(void)destroyer;
@@ -329,12 +295,12 @@ extern "C" int __aeabi_atexit(void* object, void (*destroyer)(void*), void* dso_
 	return(0);	// firmware never exits
 }
 
-extern "C" int __aeabi_sidiv(int numerator, int denominator)
+int __aeabi_sidiv(int numerator, int denominator)
 {
-	return((*ROMAPI)->divider->sidiv(numerator, denominator));
+	return((*LPC11U00ROMAPI)->divider->sidiv(numerator, denominator));
 }
 
-extern "C" unsigned int __aeabi_uidiv(unsigned int numerator, unsigned int denominator)
+unsigned int __aeabi_uidiv(unsigned int numerator, unsigned int denominator)
 {
-	return((*ROMAPI)->divider->uidiv(numerator, denominator));
+	return((*LPC11U00ROMAPI)->divider->uidiv(numerator, denominator));
 }

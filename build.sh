@@ -7,12 +7,12 @@ fi
 
 sources="\
 libc.S \
-libc.cpp \
-LPC11U00.cpp \
-LPC11U00API.cpp \
-USBAPI.cpp \
-USBCDC.cpp \
-main.cpp \
+libc.c \
+LPC11U00.c \
+LPC11U00API.c \
+USBAPI.c \
+USBCDC.c \
+main.c \
 "
 
 linkerFile="LPC11U24.x"

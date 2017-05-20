@@ -4,16 +4,14 @@
 #include <LPC11U00.h>
 #include <LPC11U00API.h>
 
-using namespace LPC11U00;
-using namespace LPC11U00::ROMUSB;
-
-struct __attribute__((packed)) USBCDCLineCoding
+typedef struct __attribute__((packed)) USBCDCLineCoding
 {
 	unsigned int	dwDTERate;		//Data terminal rate in bits per second
 	unsigned char	bCharFormat;	//Number of stop bits
 	unsigned char	bParityType;	//Parity bit type
 	unsigned char	bDataBits;		//Number of data bits
-};
+
+} USBCDCLineCoding;
 
 //Communication interface class code, section 4.2, Table 15)
 enum USBCDC_Class
@@ -193,28 +191,31 @@ enum USBCDC_State
 
 ////////////////////////////////////////////////////////////////
 
-struct __attribute__((aligned(4))) USBCDCDevice
+typedef struct USBCDCDevice
 {
-public:
-	inline bool			connected() volatile const		{return(((USBCDCDevice volatile*)this)->_connected);}
-	inline unsigned int	bytesAvailable() volatile const	{return(_readBuffer.used());}	// ...to read
-	inline unsigned int	bytesFree() volatile const		{return(_writeBuffer.free());}	// ...in which to write
-
-						USBCDCDevice(unsigned int readBufferSize, unsigned int writeBufferSize);
-
-	unsigned int		read(unsigned char* outData, unsigned int length);
-	unsigned char		readByte(void);
-	unsigned int		write(unsigned char const* data, unsigned int length);
-	void				writeByte(unsigned char b);
-	
-	static ErrorCode	usbCDCACMHandler(void* context, USBDescriptorHeader const* endpoint, USBSetup const* setupPacket);
-
-private:
 	USBCDCLineCoding	_lineCoding;
 	unsigned int		_expecting;
 	unsigned int		_connected;
+	unsigned int		_writeLength;
+	int					_writing;
 	CircularBuffer		_readBuffer;
 	CircularBuffer		_writeBuffer;
-};
+
+} USBCDCDevice;
+
+inline int				USBCDCConnected(USBCDCDevice const* cdc)		{return(((USBCDCDevice volatile*)cdc)->_connected);}
+inline unsigned int		USBCDCBytesAvailable(USBCDCDevice const* cdc)	{return(CircularBufferUsed(&cdc->_readBuffer));}	// ...to read
+inline unsigned int		USBCDCBytesFree(USBCDCDevice const* cdc)		{return(CircularBufferFree(&cdc->_writeBuffer));}	// ...in which to write
+
+int						USBCDCInit(USBCDCDevice* cdc, unsigned int readBufferSize, unsigned int writeBufferSize);
+
+unsigned int			USBCDCRead(USBCDCDevice* cdc, unsigned char* outData, unsigned int length);
+unsigned char			USBCDCReadByte(USBCDCDevice* cdc);
+unsigned int			USBCDCWrite(USBCDCDevice* cdc, unsigned char const* data, unsigned int length);
+unsigned int			USBCDCWriteByte(USBCDCDevice* cdc, unsigned char b);
+int						USBCDCFlush(USBCDCDevice* cdc);
+
+LPCUSBErrorCode			USBCDCACMHandler(void* context, LPCUSBDescriptorHeader const* endpoint, LPCUSBSetup const* setupPacket);
+
 
 #endif //!defined __USBCDC_H__
