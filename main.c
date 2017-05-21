@@ -160,7 +160,10 @@ void SysTick_Handler(void)
 
 typedef struct EncoderState
 {
-	unsigned short	ioState;
+	unsigned char	ioState;
+	unsigned char	gpioButton;
+	unsigned char	gpioPhaseA;
+	unsigned char	gpioPhaseB;
 	unsigned int	count;
 	unsigned int	lastCount;
 
@@ -170,9 +173,25 @@ typedef struct EncoderState
 } EncoderState;
 
 
-void	EncoderInit(EncoderState* state)
+void	EncoderInit(EncoderState* state, int gpioButton, int gpioPhaseA, int gpioPhaseB)
 {
-	state->ioState = ((!!GPIO0[16]) << 1) | ((!!GPIO0[23]) << 0);
+	state->gpioButton = gpioButton;
+	state->gpioPhaseA = gpioPhaseA;
+	state->gpioPhaseB = gpioPhaseB;
+	state->ioState = ((!!GPIO0[state->gpioPhaseA]) << 1) | ((!!GPIO0[state->gpioPhaseB]) << 0);
+
+	// @@todo: search for free bits in PinInterruptConfigISEL
+	*PinInterruptControl0 = gpioButton;
+	*PinInterruptControl1 = gpioPhaseA;
+	*PinInterruptControl2 = gpioPhaseB;
+
+	*PinInterruptConfigISEL = 7;
+	*PinInterruptConfigENRL = 7;
+	*PinInterruptConfigSIENR = 7;
+	*PinInterruptConfigSIENF = 7;
+
+	*InterruptEnableSet0 |= (Interrupt0_PinInt0 | Interrupt0_PinInt1 | Interrupt0_PinInt2);
+	
 	state->count = 0;
 	state->lastCount = 0;
 }
@@ -181,7 +200,7 @@ void	onEncoderRotation(void* context)
 {
 	EncoderState* state = (EncoderState*)context;
 	
-	unsigned int currentIOState = ((!!GPIO0[16]) << 1) | ((!!GPIO0[23]) << 0);
+	unsigned int currentIOState = ((!!GPIO0[state->gpioPhaseA]) << 1) | ((!!GPIO0[state->gpioPhaseB]) << 0);
 
 	currentIOState ^= (currentIOState >> 1);
 
@@ -211,10 +230,10 @@ void	onEncoderButton(void* context)
 	if(state->callback != 0)
 		state->callback(state->callbackContext, state->count, !((state->ioState >> 2) & 1));
 	
-	if(GPIO0[12])
-		state->ioState &= ~4;
+	if(GPIO0[state->gpioButton])
+		state->ioState &= ~(1 << 2);
 	else
-		state->ioState |= 4;
+		state->ioState |= (1 << 2);
 }
 
 static EncoderState gEncoderState = {0};
@@ -229,38 +248,62 @@ void	EncoderAddHandler(void (*handler)(void* context, unsigned int newCount, int
 
 void	FLEX_INT0_IRQHandler(void)
 {
-	*PinInterruptConfigIST = 7;
-	*InterruptClearPending0 = Interrupt0_PinInt0;
+	*PinInterruptConfigIST = (1 << 0);
 	onEncoderButton(&gEncoderState);
 }
 
 void	FLEX_INT1_IRQHandler(void)
 {
-	*PinInterruptConfigIST = 7;
-	*InterruptClearPending0 = Interrupt0_PinInt1;
+	*PinInterruptConfigIST = (1 << 1);
 	onEncoderRotation(&gEncoderState);
 }
 
 void	FLEX_INT2_IRQHandler(void)
 {
-	*PinInterruptConfigIST = 7;
-	*InterruptClearPending0 = Interrupt0_PinInt2;
+	*PinInterruptConfigIST = (1 << 2);
+	//*InterruptClearPending0 = Interrupt0_PinInt2;
 	onEncoderRotation(&gEncoderState);
 }
 
-static unsigned int lastCount = 0;
-static int lastPushButtonState = 0;
+enum KnobFlags
+{
+	KnobFlags_didUpdate = (1 << 0),
+	KnobFlags_buttonPressed = (1 << 1),
+	KnobFlags_buttonReleased = (1 << 2),
+	KnobFlags_rotated = (1 << 3),
+};
+
+typedef struct KnobState
+{
+	volatile int			updateFlags;
+	volatile int			rotationDelta;
+	
+	volatile unsigned int	lastCount;
+	volatile int			lastButton;
+
+} KnobState;
+
 
 void encoderHandler(void* context, unsigned int newCount, int pushButtonState)
 {
-	USBCDCDevice* cdc = (USBCDCDevice*)context;
+	KnobState* state = (KnobState*)context;
 
-	if(newCount < lastCount)
-		USBCDCWrite(cdc, (unsigned char const*)"L", 1);
-	if(newCount > lastCount)
-		USBCDCWrite(cdc, (unsigned char const*)"R", 1);
-	if(pushButtonState != lastPushButtonState)
-		USBCDCWrite(cdc, (unsigned char const*)"B", 1);
+	if((((int)newCount - (int)state->lastCount) >= 3) || (((int)newCount - (int)state->lastCount) <= -3))
+	{
+		state->rotationDelta += ((int)newCount - (int)state->lastCount);
+		
+		state->updateFlags |= (KnobFlags_didUpdate | KnobFlags_rotated);
+		state->lastCount = newCount;
+	}
+
+	if(pushButtonState != state->lastButton)
+	{
+		if(pushButtonState)
+			state->updateFlags |= (KnobFlags_didUpdate | KnobFlags_buttonPressed);
+		else
+			state->updateFlags |= (KnobFlags_didUpdate | KnobFlags_buttonReleased);
+	}
+	state->lastButton = pushButtonState;
 }
 
 
@@ -291,19 +334,11 @@ int main(void)
 	*SysTickReload = 48000000 / 1000;
 	*SysTickValue = 0;
 	
+	*IOConfigPIO0_11 = (*IOConfigPIO0_11 & ~0x1F) | IOConfigPIO0_11_Function_PIO | IOConfigPIO_PullUp;
+	*IOConfigPIO0_12 = (*IOConfigPIO0_12 & ~0x1F) | IOConfigPIO0_12_Function_PIO | IOConfigPIO_PullUp;
+	*IOConfigPIO0_13 = (*IOConfigPIO0_13 & ~0x1F) | IOConfigPIO0_13_Function_PIO | IOConfigPIO_PullUp;
 
-	*PinInterruptControl0 = 12;	// button
-	*PinInterruptControl1 = 16;	// phase A
-	*PinInterruptControl2 = 23;	// phase B
-
-	//*PinInterruptConfigENRL = 7;
-	//*PinInterruptConfigSIENR = 7;
-	//*PinInterruptConfigSIENF = 7;
-
-	*InterruptEnableSet0 |= (Interrupt0_PinInt0 | Interrupt0_PinInt1 | Interrupt0_PinInt2);
-
-
-	EncoderInit(&gEncoderState);
+	EncoderInit(&gEncoderState, 11, 12, 13);
 	
 	
 
@@ -335,7 +370,8 @@ int main(void)
 	LPCUSBConnect();
 	UARTWriteStringSync("\nConnected");
 
-	EncoderAddHandler(&encoderHandler, &cdcDevice);
+	KnobState knobState = {0};
+	EncoderAddHandler(&encoderHandler, &knobState);
 
 	unsigned int deadline = gMS + 1000;
 
@@ -361,12 +397,31 @@ int main(void)
 				}
 			}
 
+			if(knobState.updateFlags)
+			{
+				char v[20];
+				int length = NumberFormatterFormat(v, knobState.rotationDelta, 0, NumberFormatter_DecimalSigned);
+				USBCDCWrite(&cdcDevice, (unsigned char const*)"\r\n> d=", 6);
+				USBCDCWrite(&cdcDevice, (unsigned char const*)v, length);
+				
+				if(knobState.updateFlags & KnobFlags_buttonPressed)
+					USBCDCWrite(&cdcDevice, (unsigned char const*)" p", 2);
+				if(knobState.updateFlags & KnobFlags_buttonReleased)
+					USBCDCWrite(&cdcDevice, (unsigned char const*)" r", 2);
+				
+				USBCDCFlush(&cdcDevice);
+
+				knobState.rotationDelta = 0;
+				knobState.updateFlags = 0;
+			}
+
 			if(gMS > deadline)
 			{
 				UARTWriteStringSync("\nw(5)*");
 				
 				deadline = gMS + 1000;
-				USBCDCWrite(&cdcDevice, (unsigned char const*)"\r\n> Hello", 9);
+
+				USBCDCWrite(&cdcDevice, (unsigned char const*)"\r\n> hi", 6);
 				USBCDCFlush(&cdcDevice);
 			}
 		}
