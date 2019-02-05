@@ -1,5 +1,4 @@
-LPC11U24Gadget
-==============
+# LPC11U24Gadget
 
 Generally speaking, makers of integrated circuits do not document their products in a way
 that's friendly or understandable for software engineers, hobbyists, hackers or creative
@@ -9,10 +8,10 @@ available to the aforementioned groups by exposing a simple API based on [**Gala
 with additional features.
 
 
-This project is a work-in-progress.
+![LPC11U24Gadget](https://github.com/kuym/LPC11U24Gadget/blob/master/doc/DSC01025.jpg)
 
 
-## Good references for development
+## Good references for USB development
 
 * [USB in a Nutshell](http://www.beyondlogic.org/usbnutshell/usb1.shtml)
 * [USB Made Simple](http://www.usbmadesimple.co.uk/index.html)
